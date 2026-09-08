@@ -1,0 +1,23 @@
+# Core Google GenAI SDK (Gemini & Veo video generation)
+google-genai>=1.0.0
+
+# YouTube Data API v3 & OAuth Authentication
+google-api-python-client>=2.100.0
+google-auth-oauthlib>=1.2.0
+google-auth-httplib2>=0.2.0
+
+# Neural Voiceover (Free, no API key required)
+edge-tts>=6.1.12
+
+# Video Editing & Processing
+moviepy>=1.0.3
+pillow>=10.0.0
+numpy>=1.24.0
+
+# Configuration & CLI
+python-dotenv>=1.0.0
+pydantic>=2.5.0
+click>=8.1.0
+rich>=13.7.0
+schedule>=1.2.0
+requests>=2.31.0

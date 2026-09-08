@@ -1,0 +1,64 @@
+# ==========================================
+# Gemini Faceless Shorts Automator - .gitignore
+# ==========================================
+
+# 1. Environment & API Secrets (NEVER COMMIT!)
+.env
+.env.local
+.env.*.local
+client_secret*.json
+client_secret.json
+token.json
+*.pem
+*.key
+
+# 2. Generated Media Output (keeps repo lightweight)
+output/raw/*
+!output/raw/.gitkeep
+output/audio/*
+!output/audio/.gitkeep
+output/final/*
+!output/final/.gitkeep
+temp-audio.m4a
+
+# 3. Python Bytecode & Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 4. Virtual Environments
+.env/
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# 5. IDE & OS files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
