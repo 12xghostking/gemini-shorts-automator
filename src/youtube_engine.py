@@ -18,6 +18,17 @@ class YouTubeEngine:
         self.token_path = Path(token_path or (config.PROJECT_ROOT / config.YOUTUBE_TOKEN_FILE))
         self.youtube_service = None
 
+        # Automatically hydrate files from environment variables if present (e.g. in GitHub Actions)
+        client_secret_env = os.getenv("YOUTUBE_CLIENT_SECRET_JSON")
+        if client_secret_env and not self.client_secret_path.exists():
+            with open(self.client_secret_path, "w", encoding="utf-8") as f:
+                f.write(client_secret_env)
+
+        token_env = os.getenv("YOUTUBE_TOKEN_JSON")
+        if token_env and not self.token_path.exists():
+            with open(self.token_path, "w", encoding="utf-8") as f:
+                f.write(token_env)
+
     def authenticate(self) -> bool:
         """Authenticates with YouTube Data API v3 using OAuth 2.0."""
         from google.oauth2.credentials import Credentials

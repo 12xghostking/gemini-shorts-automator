@@ -131,7 +131,25 @@ python cli.py run-once --live
 
 ## ⏰ Automating 2–3 Daily Uploads
 
-### Option A: Built-in Python Scheduler
+### Option A: GitHub Actions (Recommended — 100% Cloud, No PC Needed!)
+A pre-configured GitHub Actions workflow is included at `.github/workflows/daily_shorts.yml`. It runs in the cloud on a 3x daily schedule (approx 8:30 AM, 2:30 PM, and 7:30 PM IST) and uploads the generated videos as downloadable artifacts!
+
+#### Setting Up GitHub Secrets:
+1. Push this repository to your GitHub account.
+2. In your GitHub repository, navigate to **Settings > Secrets and variables > Actions**.
+3. Under **Repository secrets**, click **New repository secret** and add:
+   - `GEMINI_API_KEY`: Your Google AI Studio API key.
+   - `YOUTUBE_CLIENT_SECRET_JSON`: The entire raw contents of your `client_secret.json` file.
+   - `YOUTUBE_TOKEN_JSON`: The entire raw contents of your `token.json` file (generated after your one-time local authentication via `python cli.py run-once --live`).
+   - `ELEVENLABS_API_KEY` *(Optional)*: If using ElevenLabs instead of free Edge-TTS.
+4. **Test in GitHub**:
+   - Go to the **Actions** tab in your repository.
+   - Select **Daily YouTube Shorts Generator & Uploader**.
+   - Click **Run workflow** (you can toggle dry-run or pick a custom niche like `dragons` or `samurai`).
+
+---
+
+### Option B: Built-in Python Scheduler (Local Machine)
 Run the continuous background runner:
 ```bash
 python cli.py schedule
@@ -141,7 +159,9 @@ By default, this posts at:
 - **02:30 PM**
 - **07:30 PM**
 
-### Option B: Windows Task Scheduler (Recommended for 24/7 PC)
+---
+
+### Option C: Windows Task Scheduler (For Always-On PC)
 1. Open Windows **Task Scheduler** (`taskschd.msc`).
 2. Click **Create Basic Task** -> Name: `YT-Shorts-Morning`.
 3. Trigger: **Daily at 9:00 AM**.
@@ -149,4 +169,4 @@ By default, this posts at:
    - Program: `python.exe`
    - Arguments: `cli.py run-once --live`
    - Start in: `c:\Users\sirki\projects\gemini-shorts-automator`
-5. Repeat for your afternoon and evening time slots!
+5. Repeat for afternoon and evening slots!
