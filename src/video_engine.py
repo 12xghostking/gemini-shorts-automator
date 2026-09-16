@@ -71,19 +71,65 @@ class VideoEngine:
         return dest_path
 
     def _generate_mock_clip(self, dest_path: Path, prompt_text: str) -> Path:
-        """Creates a smooth animated gradient 9:16 vertical MP4 for testing without API usage."""
+        """Creates a dynamic animated 9:16 vertical MP4 with visual motion and badges for testing."""
+        import math
+        import numpy as np
+        from PIL import Image, ImageDraw
+
         try:
-            from moviepy import ColorClip
+            from moviepy import VideoClip
         except ImportError:
-            from moviepy.editor import ColorClip
+            from moviepy.editor import VideoClip
 
         duration = 5.0
-        fps = config.VIDEO_FPS
-        w, h = config.VIDEO_WIDTH, config.VIDEO_HEIGHT
+        fps = 24
+        w, h = 540, 960  # Render at clean mobile 9:16 resolution for fast rendering
 
-        bg_clip = ColorClip(size=(w, h), color=(18, 18, 28), duration=duration)
+        clean_prompt = prompt_text[:70] + "..." if len(prompt_text) > 70 else prompt_text
 
-        bg_clip.write_videofile(
+        def make_frame(t):
+            # Dynamic gradient background
+            r_bg = int(18 + 10 * math.sin(t * 1.5))
+            g_bg = int(14 + 8 * math.cos(t * 2.0))
+            b_bg = int(32 + 15 * math.sin(t * 1.2))
+
+            img = Image.new("RGB", (w, h), color=(r_bg, g_bg, b_bg))
+            draw = ImageDraw.Draw(img)
+
+            cx, cy = w // 2, h // 2 - 60
+
+            # Pulsing energy circles
+            pulse1 = int(80 + 30 * math.sin(t * 3.5))
+            pulse2 = int(50 + 20 * math.cos(t * 4.0))
+            draw.ellipse([cx - pulse1, cy - pulse1, cx + pulse1, cy + pulse1], outline=(0, 220, 255), width=3)
+            draw.ellipse([cx - pulse2, cy - pulse2, cx + pulse2, cy + pulse2], outline=(255, 60, 160), width=2)
+
+            # Animated horizontal scan lines
+            scan_y = int((t * 220) % h)
+            draw.line([(0, scan_y), (w, scan_y)], fill=(0, 255, 200, 100), width=2)
+
+            # Top Badge
+            draw.rectangle([30, 60, w - 30, 120], fill=(28, 24, 48), outline=(0, 220, 255), width=2)
+            draw.text((w // 2 - 100, 80), "[ DRY-RUN / MOCK PREVIEW ]", fill=(0, 255, 220))
+
+            # Center Info Box
+            draw.rectangle([30, h - 340, w - 30, h - 80], fill=(22, 18, 38), outline=(255, 60, 160), width=2)
+            draw.text((50, h - 310), "AI Video Generator Status:", fill=(255, 200, 50))
+            draw.text((50, h - 280), "Live Veo 3 Video replaces this visual", fill=(240, 240, 255))
+            draw.text((50, h - 250), "when you run with: --live", fill=(0, 255, 180))
+
+            # Prompt preview
+            draw.text((50, h - 200), "Prompt Preview:", fill=(180, 180, 210))
+            draw.text((50, h - 170), f"\"{clean_prompt}\"", fill=(220, 220, 240))
+
+            # Dynamic timeline / progress bar
+            prog_w = int(((t / duration)) * (w - 60))
+            draw.rectangle([30, h - 50, 30 + prog_w, h - 40], fill=(0, 255, 200))
+
+            return np.array(img)
+
+        clip = VideoClip(make_frame, duration=duration)
+        clip.write_videofile(
             str(dest_path),
             fps=fps,
             codec="libx264",

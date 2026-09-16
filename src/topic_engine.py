@@ -116,16 +116,24 @@ Respond ONLY with valid JSON matching this schema:
   "tags": ["string", "string"]
 }}
 """
-        try:
-            from google.genai import types
-            chat = self.client.chats.create(
-                model=config.GEMINI_TEXT_MODEL,
-                config=types.GenerateContentConfig(response_mime_type="application/json")
-            )
-            response = chat.send_message(prompt)
-            raw_text = response.text.strip()
-            data = json.loads(raw_text)
-            return ShortConcept(**data)
-        except Exception as e:
-            logger.error(f"Gemini API error during topic generation: {e}. Falling back to template.")
-            return random.choice(FALLBACK_CONCEPTS)
+        import time
+        from google.genai import types
+
+        candidate_models = [config.GEMINI_TEXT_MODEL, "gemini-flash-latest"]
+        for model_name in candidate_models:
+            for attempt in range(2):
+                try:
+                    chat = self.client.chats.create(
+                        model=model_name,
+                        config=types.GenerateContentConfig(response_mime_type="application/json")
+                    )
+                    response = chat.send_message(prompt)
+                    raw_text = response.text.strip()
+                    data = json.loads(raw_text)
+                    return ShortConcept(**data)
+                except Exception as e:
+                    logger.warning(f"Gemini attempt {attempt + 1} with {model_name} failed: {e}")
+                    time.sleep(2)
+
+        logger.error("All Gemini API attempts failed. Falling back to curated template.")
+        return random.choice(FALLBACK_CONCEPTS)
