@@ -117,11 +117,12 @@ Respond ONLY with valid JSON matching this schema:
 }}
 """
         try:
-            response = self.client.models.generate_content(
+            from google.genai import types
+            chat = self.client.chats.create(
                 model=config.GEMINI_TEXT_MODEL,
-                contents=prompt,
-                config={"response_mime_type": "application/json"}
+                config=types.GenerateContentConfig(response_mime_type="application/json")
             )
+            response = chat.send_message(prompt)
             raw_text = response.text.strip()
             data = json.loads(raw_text)
             return ShortConcept(**data)
