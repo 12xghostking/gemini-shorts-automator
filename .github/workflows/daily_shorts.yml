@@ -2,8 +2,8 @@ name: Hourly YouTube Shorts Generator & Uploader (24x Daily)
 
 on:
   schedule:
-    # Runs every hour at minute 0 (24 times a day)
-    - cron: '0 * * * *'
+    # Runs every hour at minute 15 (off-peak to avoid GitHub top-of-hour :00 delays)
+    - cron: '15 * * * *'
 
   workflow_dispatch:
     inputs:
