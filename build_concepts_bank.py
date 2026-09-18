@@ -181,7 +181,7 @@ ARCHETYPES = [
     {"name": "Cybernetic Shadow Monk", "category": "Neo-Tokyo & Cyberpunk", "weapon": "monomolecular clawed gauntlets", "power": "moving so fast cameras only capture static"},
     {"name": "Kinetic Juggernaut", "category": "Futuristic Mecha & Sci-Fi Warfare", "weapon": "heavy kinetic battering ram", "power": "absorbing bullet impacts to supercharge punches"},
     {"name": "Ghost Fleet Captain", "category": "Cosmic Entities & Nebula Gods", "weapon": "plasma cutlass and boarding hook", "power": "cloaking entire battlecruisers inside asteroid fields"},
-    {"name": "Cyber Samurai Duelist", "category": "Cyberpunk & Feudal Warriors", "weapon": "overheated red katana blade", "power": "cauterizing wounds while cutting through steel plating"},
+    {"name": "Cyber Samurai Duelist", "category": "Cyberpunk & Feudal Warriors", "weapon": "an overheated red plasma katana", "power": "shearing through armored mech plating with solar heat"},
     {"name": "Heavy Ordnance Trooper", "category": "Futuristic Mecha & Sci-Fi Warfare", "weapon": "quad-barrel rocket launcher", "power": "leveling enemy sniper perches in seconds"},
     {"name": "Nanite Shield Warden", "category": "Neo-Tokyo & Cyberpunk", "weapon": "expanding honeycomb energy shields", "power": "protecting civilian convoys from airstrikes"},
     {"name": "Bio-Mech Hybrid", "category": "Futuristic Mecha & Sci-Fi Warfare", "weapon": "symbiote cyber-tentacles and acid spray", "power": "infecting enemy machinery and consuming their power"},

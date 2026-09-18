@@ -81,19 +81,24 @@ class VideoEngine:
             logger.info(f"   [AI IMAGES] Requesting batch of {count} distinct images from distributed free cluster...")
             horde_urls = self._fetch_horde_batch(core, count=count)
             if horde_urls:
-                for idx, url in enumerate(horde_urls):
-                    dest_img = config.IMAGES_DIR / f"img_{base_timestamp}_scene{idx + 1}.jpg"
+                for url in horde_urls:
+                    if len(image_paths) >= count:
+                        break
+                    dest_img = config.IMAGES_DIR / f"img_{base_timestamp}_scene{len(image_paths) + 1}.jpg"
                     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
                     with urllib.request.urlopen(req, timeout=25) as resp:
                         img = Image.open(resp).convert("RGB")
+                        if self._is_image_corrupt_or_censored(img):
+                            logger.warning(f"   [AI IMAGES] Downloaded image is censored/corrupted. Discarding to regenerate clean image...")
+                            continue
                         img = img.resize((720, 1280), Image.Resampling.LANCZOS)
                         img.save(str(dest_img), "JPEG", quality=95)
                         image_paths.append(dest_img)
-                        logger.info(f"   [SCENE {idx + 1}/{len(horde_urls)}] Saved distinct image to {dest_img.name}")
+                        logger.info(f"   [SCENE {len(image_paths)}/{count}] Saved verified distinct image to {dest_img.name}")
         except Exception as e:
             logger.warning(f"   [AI IMAGES] AI Horde batch generation error: {e}")
 
-        # Method 2: Resilient retry loop with backoff via Pollinations for any remaining scenes
+        # Method 2: Resilient retry loop with backoff for any remaining scenes (filters out any censored images)
         if len(image_paths) < count:
             logger.info(f"   [AI IMAGES] Generating remaining {count - len(image_paths)} distinct scenes...")
             scene_modifiers = [
@@ -105,66 +110,86 @@ class VideoEngine:
                 "aerial top-down dramatic view, shattered environment, neon reflections"
             ]
 
-            needed = count - len(image_paths)
-            start_idx = len(image_paths)
-            for i in range(needed):
-                idx = start_idx + i
+            attempt_idx = 0
+            while len(image_paths) < count and attempt_idx < 12:
+                attempt_idx += 1
+                idx = len(image_paths)
                 dest_img = config.IMAGES_DIR / f"img_{base_timestamp}_scene{idx + 1}.jpg"
                 modifier = scene_modifiers[idx % len(scene_modifiers)]
                 clean_p = f"{core}, {modifier}, vertical 9:16 framing, photorealistic, 8k"
 
-                # Retry up to 4 attempts with exponential backoff on 429 or timeout
-                success = False
-                for attempt in range(1, 5):
-                    if attempt > 1:
-                        wait_seconds = attempt * 8
-                        logger.info(f"   [SCENE {idx + 1}] Waiting {wait_seconds}s before retry {attempt}/4 to prevent rate limiting...")
-                        time.sleep(wait_seconds)
-                    elif i > 0:
-                        # Polite spacing between scene requests
-                        time.sleep(4)
+                # Polite spacing between scene requests
+                if attempt_idx > 1:
+                    wait_sec = min(20, 5 + attempt_idx * 3)
+                    logger.info(f"   [SCENE {idx + 1}] Waiting {wait_sec}s before retry #{attempt_idx} to avoid rate limits...")
+                    time.sleep(wait_sec)
 
-                    try:
-                        seed = random.randint(1000, 999999)
-                        encoded_p = urllib.parse.quote(clean_p)
-                        url = f"https://image.pollinations.ai/prompt/{encoded_p}?width=720&height=1280&nologo=true&seed={seed}"
-                        req = urllib.request.Request(
-                            url,
-                            headers={"User-Agent": f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) ShortsBot/{seed % 100}"}
-                        )
-                        with urllib.request.urlopen(req, timeout=30) as resp:
-                            img = Image.open(resp).convert("RGB")
+                success = False
+                try:
+                    seed = random.randint(1000, 999999)
+                    encoded_p = urllib.parse.quote(clean_p)
+                    url = f"https://image.pollinations.ai/prompt/{encoded_p}?width=720&height=1280&nologo=true&seed={seed}"
+                    req = urllib.request.Request(
+                        url,
+                        headers={"User-Agent": f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) ShortsBot/{seed % 100}"}
+                    )
+                    with urllib.request.urlopen(req, timeout=30) as resp:
+                        img = Image.open(resp).convert("RGB")
+                        if self._is_image_corrupt_or_censored(img):
+                            logger.warning(f"   [SCENE {idx + 1}] Downloaded image is censored/corrupt! Discarding to regenerate another in place...")
+                        else:
                             w, h = img.size
                             if h > 50:
                                 img = img.crop((0, 0, w, h - 45))
                                 img = img.resize((720, 1280), Image.Resampling.LANCZOS)
                             img.save(str(dest_img), "JPEG", quality=95)
                             image_paths.append(dest_img)
-                            logger.info(f"   [SCENE {idx + 1}/{count}] Saved distinct image to {dest_img.name}")
+                            logger.info(f"   [SCENE {len(image_paths)}/{count}] Saved verified distinct image to {dest_img.name}")
                             success = True
-                            break
-                    except Exception as e:
-                        logger.warning(f"   [SCENE {idx + 1} attempt {attempt}/4] Generation attempt error: {e}")
+                except Exception as e:
+                    logger.warning(f"   [SCENE {idx + 1}] Pollinations attempt error: {e}")
 
-                if not success:
-                    # As absolute last resort, fetch a single rapid AI Horde image for this scene
-                    logger.info(f"   [SCENE {idx + 1}] Requesting single scene fallback from distributed cluster...")
+                if not success and len(image_paths) < count:
+                    # Single cluster fallback
+                    logger.info(f"   [SCENE {idx + 1}] Requesting single fresh scene from cluster...")
                     try:
                         single_urls = self._fetch_horde_batch(clean_p, count=1, max_wait_seconds=45)
                         if single_urls:
                             sreq = urllib.request.Request(single_urls[0], headers={"User-Agent": "Mozilla/5.0"})
                             with urllib.request.urlopen(sreq, timeout=20) as sresp:
-                                img = Image.open(sresp).convert("RGB").resize((720, 1280), Image.Resampling.LANCZOS)
-                                img.save(str(dest_img), "JPEG", quality=95)
-                                image_paths.append(dest_img)
-                                logger.info(f"   [SCENE {idx + 1}/{count}] Saved distinct fallback image to {dest_img.name}")
+                                img = Image.open(sresp).convert("RGB")
+                                if not self._is_image_corrupt_or_censored(img):
+                                    img = img.resize((720, 1280), Image.Resampling.LANCZOS)
+                                    img.save(str(dest_img), "JPEG", quality=95)
+                                    image_paths.append(dest_img)
+                                    logger.info(f"   [SCENE {len(image_paths)}/{count}] Saved verified fallback image to {dest_img.name}")
                     except Exception as he:
-                        logger.warning(f"   [SCENE {idx + 1}] Single cluster fallback failed: {he}")
+                        logger.warning(f"   [SCENE {idx + 1}] Single cluster fallback error: {he}")
 
         return image_paths
 
+    def _is_image_corrupt_or_censored(self, img: Image.Image) -> bool:
+        """
+        Validates an image to ensure it is not a censored warning, black placeholder, or corrupt render.
+        Returns True if image is bad / censored, False if it is a valid scene image.
+        """
+        w, h = img.size
+        if w < 200 or h < 200:
+            return True
+        arr = np.array(img)
+        # Check for predominant black screen (> 75% pure black pixels) with low brightness
+        # (Standard AI Horde / Stable Diffusion "CENSORED" warning text on pure black screen)
+        black_ratio = float((arr < 25).all(axis=-1).mean())
+        mean_brightness = float(arr.mean())
+        if black_ratio > 0.75 and mean_brightness < 35.0:
+            return True
+        # Check for flat solid single color (corrupt or blank render)
+        if float(arr.std()) < 6.0:
+            return True
+        return False
+
     def _fetch_horde_batch(self, prompt: str, count: int = 5, max_wait_seconds: int = 105) -> List[str]:
-        """Submits a batch generation job to AI Horde and waits for completed image URLs."""
+        """Submits a batch generation job to AI Horde and waits for completed, uncensored image URLs."""
         url = "https://aihorde.net/api/v2/generate/async"
         payload = json.dumps({
             "prompt": f"{prompt}, vertical 9:16 framing, masterpiece, photorealistic, 8k, cinematic lighting",
@@ -205,12 +230,18 @@ class VideoEngine:
             except Exception:
                 pass
 
-        # Retrieve completed image URLs
+        # Retrieve completed image URLs (ignoring any censored generations)
         status_url = f"https://aihorde.net/api/v2/generate/status/{job_id}"
         sreq = urllib.request.Request(status_url, headers=headers)
         with urllib.request.urlopen(sreq, timeout=15) as sresp:
             sdata = json.loads(sresp.read().decode())
-            return [g.get("img") for g in sdata.get("generations", []) if g.get("img")]
+            valid_urls = []
+            for g in sdata.get("generations", []):
+                if g.get("img") and not g.get("censored", False):
+                    valid_urls.append(g.get("img"))
+                elif g.get("censored"):
+                    logger.warning("   [AI HORDE] Safety filter censored a generation. Discarding to regenerate clean image.")
+            return valid_urls
 
     def _render_multi_image_cinematic_video(
         self,
