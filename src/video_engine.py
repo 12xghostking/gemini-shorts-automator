@@ -65,8 +65,15 @@ class VideoEngine:
             raise RuntimeError(f"Veo video generation failed: {operation.error}")
 
         generated_video = operation.response.generated_videos[0]
-        # Download and save the video file
-        generated_video.video.save(str(dest_path))
+        # Download and save the remote video file
+        try:
+            self.client.files.download(file=generated_video.video, destination=str(dest_path))
+        except Exception:
+            if getattr(generated_video.video, "video_bytes", None):
+                generated_video.video.save(str(dest_path))
+            else:
+                self.client.files.download(file=generated_video, destination=str(dest_path))
+
         logger.info(f"[OK] Video generated and saved successfully: {dest_path}")
         return dest_path
 
