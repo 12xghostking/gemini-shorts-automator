@@ -50,6 +50,11 @@ EDGE_TTS_VOICE_POOL = [
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "").strip()
 ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")
 
+# Subtitle / Caption Settings
+BURN_SUBTITLES = os.getenv("BURN_SUBTITLES", "true").lower() in ("true", "1", "yes")
+SUBTITLE_FONT_SIZE = int(os.getenv("SUBTITLE_FONT_SIZE", "22"))
+SUBTITLE_WORDS_PER_CARD = int(os.getenv("SUBTITLE_WORDS_PER_CARD", "4"))
+
 # Video Settings
 VIDEO_WIDTH = int(os.getenv("VIDEO_WIDTH", "720"))
 VIDEO_HEIGHT = int(os.getenv("VIDEO_HEIGHT", "1280"))

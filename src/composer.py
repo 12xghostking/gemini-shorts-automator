@@ -121,42 +121,90 @@ class VideoComposer:
         vo_duration = get_media_duration(voiceover_path) if has_vo else 15.0
         final_duration = min(vo_duration + 0.5, float(config.MAX_DURATION_SECONDS))
 
+        srt_path = voiceover_path.with_suffix(".srt") if has_vo else None
+        has_subs = getattr(config, "BURN_SUBTITLES", True) and srt_path and srt_path.exists() and srt_path.stat().st_size > 10
+
         if ffmpeg_bin and has_vo:
-            logger.info(f"[COMPOSER] Using direct FFmpeg stream muxer (Target Duration: {final_duration:.1f}s)...")
+            logger.info(f"[COMPOSER] Using direct FFmpeg stream muxer (Target Duration: {final_duration:.1f}s, Burnt-In Subtitles: {bool(has_subs)})...")
             try:
+                # Configure subtitle filter and video codec
+                if has_subs:
+                    escaped_srt = str(srt_path.resolve()).replace("\\", "/").replace(":", "\\:")
+                    font_size = int(getattr(config, "SUBTITLE_FONT_SIZE", 22) * (self.height / 1280.0))
+                    margin_v = int(self.height * 0.12)  # ~150px on 1280h, ~230px on 1920h (above YouTube Shorts UI)
+                    sub_style = (
+                        f"FontName=Arial,FontSize={font_size},Bold=1,"
+                        f"PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BackColour=&H80000000,"
+                        f"Outline=3,Shadow=1,Alignment=2,MarginV={margin_v}"
+                    )
+                    v_filter = f"[0:v]subtitles='{escaped_srt}':force_style='{sub_style}'[vout]"
+                    v_map = "[vout]"
+                    v_codec_args = ["-c:v", "libx264", "-preset", "ultrafast", "-crf", "23"]
+                else:
+                    v_filter = None
+                    v_map = "0:v"
+                    v_codec_args = ["-c:v", "copy"]
+
                 if has_music:
-                    filter_complex = "[1:a]volume=1.0[vo];[2:a]aloop=loop=-1:size=2e+09,volume=0.15[bg];[vo][bg]amix=inputs=2:duration=first:dropout_transition=0[aout]"
+                    if v_filter:
+                        filter_complex = (
+                            f"{v_filter};"
+                            f"[1:a]volume=1.0[vo];"
+                            f"[2:a]aloop=loop=-1:size=2e+09,volume=0.15[bg];"
+                            f"[vo][bg]amix=inputs=2:duration=first:dropout_transition=0[aout]"
+                        )
+                    else:
+                        filter_complex = (
+                            f"[1:a]volume=1.0[vo];"
+                            f"[2:a]aloop=loop=-1:size=2e+09,volume=0.15[bg];"
+                            f"[vo][bg]amix=inputs=2:duration=first:dropout_transition=0[aout]"
+                        )
                     cmd = [
                         ffmpeg_bin, "-y",
                         "-i", str(video_path),
                         "-i", str(voiceover_path),
                         "-i", str(music_path),
                         "-filter_complex", filter_complex,
-                        "-map", "0:v",
+                        "-map", v_map,
                         "-map", "[aout]",
-                        "-c:v", "copy",
+                        *v_codec_args,
                         "-c:a", "aac",
                         "-b:a", "192k",
                         "-t", f"{final_duration:.2f}",
                         str(dest_path)
                     ]
                 else:
-                    cmd = [
-                        ffmpeg_bin, "-y",
-                        "-i", str(video_path),
-                        "-i", str(voiceover_path),
-                        "-map", "0:v",
-                        "-map", "1:a",
-                        "-c:v", "copy",
-                        "-c:a", "aac",
-                        "-b:a", "192k",
-                        "-t", f"{final_duration:.2f}",
-                        str(dest_path)
-                    ]
+                    if v_filter:
+                        cmd = [
+                            ffmpeg_bin, "-y",
+                            "-i", str(video_path),
+                            "-i", str(voiceover_path),
+                            "-filter_complex", v_filter,
+                            "-map", v_map,
+                            "-map", "1:a",
+                            *v_codec_args,
+                            "-c:a", "aac",
+                            "-b:a", "192k",
+                            "-t", f"{final_duration:.2f}",
+                            str(dest_path)
+                        ]
+                    else:
+                        cmd = [
+                            ffmpeg_bin, "-y",
+                            "-i", str(video_path),
+                            "-i", str(voiceover_path),
+                            "-map", "0:v",
+                            "-map", "1:a",
+                            "-c:v", "copy",
+                            "-c:a", "aac",
+                            "-b:a", "192k",
+                            "-t", f"{final_duration:.2f}",
+                            str(dest_path)
+                        ]
 
                 res = subprocess.run(cmd, capture_output=True, text=True)
                 if res.returncode == 0 and dest_path.exists() and dest_path.stat().st_size > 1000:
-                    logger.info(f"[OK] Successfully muxed final Short ({final_duration:.1f}s) via FFmpeg: {dest_path}")
+                    logger.info(f"[OK] Successfully muxed final Short ({final_duration:.1f}s) via FFmpeg (Subtitles: {bool(has_subs)}): {dest_path}")
                     gc.collect()
                     return dest_path
                 else:

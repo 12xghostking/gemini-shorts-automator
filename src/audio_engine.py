@@ -66,6 +66,94 @@ def format_dramatic_narration(text: str) -> str:
     return cleaned
 
 
+from datetime import timedelta
+
+def format_srt_time(td: timedelta) -> str:
+    """Formats timedelta into SRT timestamp format: HH:MM:SS,mmm"""
+    total_seconds = int(td.total_seconds())
+    hours = total_seconds // 3600
+    minutes = (total_seconds % 3600) // 60
+    seconds = total_seconds % 60
+    millis = int(td.microseconds / 1000)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d},{millis:03d}"
+
+
+def split_cues_into_punchy_chunks(cues, max_words_per_chunk: int = 4):
+    """Splits long sentence cues into punchy 3-5 word subtitle cards with natural timing."""
+    punchy_cues = []
+    cue_idx = 1
+    for cue in cues:
+        text = cue.content.strip()
+        words = text.split()
+        if len(words) <= max_words_per_chunk:
+            punchy_cues.append({
+                "index": cue_idx,
+                "start": cue.start,
+                "end": cue.end,
+                "text": text
+            })
+            cue_idx += 1
+            continue
+
+        chunks = []
+        for i in range(0, len(words), max_words_per_chunk):
+            chunks.append(" ".join(words[i:i + max_words_per_chunk]))
+
+        total_duration = (cue.end - cue.start).total_seconds()
+        total_chars = sum(len(c) for c in chunks)
+
+        current_start = cue.start
+        for chunk in chunks:
+            chunk_dur = total_duration * (len(chunk) / max(1, total_chars))
+            current_end = current_start + timedelta(seconds=chunk_dur)
+            punchy_cues.append({
+                "index": cue_idx,
+                "start": current_start,
+                "end": current_end,
+                "text": chunk
+            })
+            cue_idx += 1
+            current_start = current_end
+
+    return punchy_cues
+
+
+def generate_srt(punchy_cues) -> str:
+    """Renders cue dictionaries into standard SRT subtitle format."""
+    lines = []
+    for c in punchy_cues:
+        lines.append(str(c["index"]))
+        lines.append(f"{format_srt_time(c['start'])} --> {format_srt_time(c['end'])}")
+        lines.append(c["text"])
+        lines.append("")
+    return "\n".join(lines)
+
+
+def generate_fallback_subtitles(text: str, duration: float, srt_path: Path, max_words: int = 4):
+    """Generates evenly spaced subtitle cards across audio duration if direct word boundaries are unavailable."""
+    words = text.strip().split()
+    if not words or duration <= 0:
+        return
+    chunks = []
+    for i in range(0, len(words), max_words):
+        chunks.append(" ".join(words[i:i + max_words]))
+
+    time_per_chunk = duration / len(chunks)
+    cues = []
+    for idx, chunk in enumerate(chunks, 1):
+        start = timedelta(seconds=(idx - 1) * time_per_chunk)
+        end = timedelta(seconds=min(duration, idx * time_per_chunk))
+        cues.append({
+            "index": idx,
+            "start": start,
+            "end": end,
+            "text": chunk
+        })
+    srt_content = generate_srt(cues)
+    with open(str(srt_path), "w", encoding="utf-8") as f:
+        f.write(srt_content)
+
+
 class AudioEngine:
     def __init__(self):
         self.engine = config.TTS_ENGINE
@@ -100,7 +188,7 @@ class AudioEngine:
             return self._generate_edge_tts(text, dest_path)
 
     def _generate_edge_tts(self, text: str, dest_path: Path) -> Path:
-        """Generates hyper-realistic neural voiceover using Edge TTS with dramatic cadence."""
+        """Generates hyper-realistic neural voiceover using Edge TTS with dramatic cadence and synced SRT subtitles."""
         profile = self._select_voice_profile()
         voice_id = profile["voice"]
         voice_label = profile.get("name", voice_id)
@@ -120,7 +208,31 @@ class AudioEngine:
                     rate=rate,
                     pitch=pitch
                 )
-                await communicate.save(str(dest_path))
+                submaker = edge_tts.SubMaker()
+                with open(str(dest_path), "wb") as f:
+                    async for chunk in communicate.stream():
+                        if chunk["type"] == "audio":
+                            f.write(chunk["data"])
+                        elif chunk["type"] in ("WordBoundary", "SentenceBoundary"):
+                            submaker.feed(chunk)
+
+                srt_path = dest_path.with_suffix(".srt")
+                if submaker.cues:
+                    punchy = split_cues_into_punchy_chunks(
+                        submaker.cues,
+                        max_words_per_chunk=getattr(config, "SUBTITLE_WORDS_PER_CARD", 4)
+                    )
+                    srt_content = generate_srt(punchy)
+                    with open(str(srt_path), "w", encoding="utf-8") as sf:
+                        sf.write(srt_content)
+                    logger.info(f"[SUBTITLES] Generated {len(punchy)} punchy subtitle cues: {srt_path.name}")
+                else:
+                    generate_fallback_subtitles(
+                        dramatic_text,
+                        15.0,
+                        srt_path,
+                        max_words=getattr(config, "SUBTITLE_WORDS_PER_CARD", 4)
+                    )
 
             asyncio.run(_run())
             logger.info(f"[OK] Dramatic voiceover saved at: {dest_path}")
@@ -130,7 +242,7 @@ class AudioEngine:
             return self._generate_silent_audio(dest_path, duration=5.0)
 
     def _generate_elevenlabs(self, text: str, dest_path: Path) -> Path:
-        """Generates voiceover using ElevenLabs API."""
+        """Generates voiceover using ElevenLabs API with synced fallback subtitles."""
         import requests
         logger.info(f"[VOICE] Generating voiceover with ElevenLabs...")
         url = f"https://api.elevenlabs.io/v1/text-to-speech/{config.ELEVENLABS_VOICE_ID}"
@@ -149,6 +261,15 @@ class AudioEngine:
             with open(dest_path, "wb") as f:
                 f.write(resp.content)
             logger.info(f"ElevenLabs voiceover saved to: {dest_path}")
+
+            # Generate subtitles matching audio duration
+            try:
+                from src.composer import get_media_duration
+                vo_dur = get_media_duration(dest_path)
+                generate_fallback_subtitles(text, vo_dur, dest_path.with_suffix(".srt"))
+            except Exception:
+                pass
+
             return dest_path
         else:
             logger.error(f"ElevenLabs API error ({resp.status_code}): {resp.text}")
