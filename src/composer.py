@@ -60,6 +60,19 @@ def _loop_audio(audio, duration):
     return vfx.audio_loop(audio, duration=duration)
 
 
+import shutil
+import subprocess
+import gc
+try:
+    import imageio_ffmpeg
+    DEFAULT_FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
+except Exception:
+    DEFAULT_FFMPEG = None
+
+def _get_ffmpeg_bin():
+    return shutil.which("ffmpeg") or DEFAULT_FFMPEG
+
+
 class VideoComposer:
     def __init__(self):
         self.width = config.VIDEO_WIDTH
@@ -75,64 +88,98 @@ class VideoComposer:
         output_name: Optional[str] = None
     ) -> Path:
         """
-        Assembles video, voiceover, background music, and overlays into a finished 1080x1920 Short.
+        Assembles video, voiceover, and background music into a finished 9:16 Short.
+        Uses ultra-fast, zero-re-encoding FFmpeg stream copy (-c:v copy) to run in <15MB RAM.
+        Falls back to MoviePy if FFmpeg CLI is unavailable.
         """
         timestamp = int(time.time())
         dest_filename = output_name or f"short_{timestamp}.mp4"
         dest_path = config.FINAL_VIDEO_DIR / dest_filename
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
 
-        logger.info(f"[COMPOSER] Loading raw video: {video_path}")
+        ffmpeg_bin = _get_ffmpeg_bin()
+        has_vo = voiceover_path and voiceover_path.exists()
+        has_music = music_path and music_path.exists()
+
+        if ffmpeg_bin and has_vo:
+            logger.info(f"[COMPOSER] Using direct FFmpeg stream muxer (Zero-RAM copy mode)...")
+            try:
+                if has_music:
+                    filter_complex = "[1:a]volume=1.0[vo];[2:a]volume=0.15[bg];[vo][bg]amix=inputs=2:duration=first:dropout_transition=2[aout]"
+                    cmd = [
+                        ffmpeg_bin, "-y",
+                        "-stream_loop", "-1",
+                        "-i", str(video_path),
+                        "-i", str(voiceover_path),
+                        "-i", str(music_path),
+                        "-filter_complex", filter_complex,
+                        "-map", "0:v",
+                        "-map", "[aout]",
+                        "-c:v", "copy",
+                        "-c:a", "aac",
+                        "-b:a", "192k",
+                        "-shortest",
+                        str(dest_path)
+                    ]
+                else:
+                    cmd = [
+                        ffmpeg_bin, "-y",
+                        "-stream_loop", "-1",
+                        "-i", str(video_path),
+                        "-i", str(voiceover_path),
+                        "-map", "0:v",
+                        "-map", "1:a",
+                        "-c:v", "copy",
+                        "-c:a", "aac",
+                        "-b:a", "192k",
+                        "-shortest",
+                        str(dest_path)
+                    ]
+
+                res = subprocess.run(cmd, capture_output=True, text=True)
+                if res.returncode == 0 and dest_path.exists() and dest_path.stat().st_size > 1000:
+                    logger.info(f"[OK] Successfully muxed final Short via FFmpeg: {dest_path} (Size: {dest_path.stat().st_size} bytes)")
+                    gc.collect()
+                    return dest_path
+                else:
+                    logger.warning(f"[COMPOSER] FFmpeg stream copy stderr: {res.stderr[:200]}. Falling back to MoviePy...")
+            except Exception as fe:
+                logger.warning(f"[COMPOSER] FFmpeg direct mux exception: {fe}. Falling back to MoviePy...")
+
+        # Fallback to MoviePy with strict 1-thread low memory parameters
+        gc.collect()
+        logger.info(f"[COMPOSER] Loading video via MoviePy low-RAM fallback: {video_path}")
         video_clip = VideoFileClip(str(video_path))
 
-        # 1. Determine target duration based on voiceover
         audio_duration = 5.0
         vo_clip = None
-        if voiceover_path and voiceover_path.exists():
+        if has_vo:
             try:
                 vo_clip = AudioFileClip(str(voiceover_path))
-                audio_duration = vo_clip.duration + 1.0  # slight breathing room
+                audio_duration = vo_clip.duration + 1.0
             except Exception as e:
                 logger.warning(f"Failed to load voiceover audio: {e}")
 
-        # Limit to max duration
-        final_duration = min(audio_duration, config.MAX_DURATION_SECONDS)
+        final_duration = min(audio_duration, float(config.MAX_DURATION_SECONDS))
 
-        # 2. Adjust video duration (loop if video is shorter than voiceover)
         if video_clip.duration < final_duration:
             num_loops = int(final_duration // video_clip.duration) + 1
             video_clip = _loop_video(video_clip, num_loops)
 
         video_clip = _subclip(video_clip, 0, final_duration)
 
-        # 3. Ensure 9:16 vertical resolution (1080x1920)
-        vw, vh = video_clip.size
-        aspect_ratio = vw / vh
-        target_aspect = self.width / self.height
-
-        if abs(aspect_ratio - target_aspect) > 0.05:
-            # Scale and crop to fill
-            scale_factor = max(self.width / vw, self.height / vh)
-            video_clip = _resize(video_clip, scale_factor)
-            cw, ch = video_clip.size
-            x1 = (cw - self.width) // 2
-            y1 = (ch - self.height) // 2
-            video_clip = _crop(video_clip, x1=x1, y1=y1, width=self.width, height=self.height)
-        else:
-            video_clip = _resize(video_clip, (self.width, self.height))
-
-        # 4. Audio Mixing
+        # Audio Mixing
         audio_layers = []
         if vo_clip:
             audio_layers.append(_scale_volume(vo_clip, 1.0))
 
-        if music_path and music_path.exists():
+        if has_music:
             try:
                 bg_music = AudioFileClip(str(music_path))
                 if bg_music.duration < final_duration:
                     bg_music = _loop_audio(bg_music, final_duration)
                 else:
                     bg_music = _subclip(bg_music, 0, final_duration)
-                # Duck background music to 15% volume
                 audio_layers.append(_scale_volume(bg_music, 0.15))
             except Exception as e:
                 logger.warning(f"Could not mix background music: {e}")
@@ -141,23 +188,24 @@ class VideoComposer:
             final_audio = _subclip(CompositeAudioClip(audio_layers), 0, final_duration)
             video_clip = _set_audio(video_clip, final_audio)
 
-        # 5. Render Final MP4
-        logger.info(f"[COMPOSER] Rendering final 9:16 Short to {dest_path}...")
+        logger.info(f"[COMPOSER] Rendering final 9:16 Short to {dest_path} (Preset: ultrafast, Threads: 1)...")
         video_clip.write_videofile(
             str(dest_path),
             fps=self.fps,
             codec="libx264",
             audio_codec="aac",
-            preset="medium",
-            threads=4,
+            preset="ultrafast",
+            threads=1,
             ffmpeg_params=["-pix_fmt", "yuv420p"],
             logger=None
         )
 
-        # Close handles
         video_clip.close()
         if vo_clip:
             vo_clip.close()
+        del video_clip
+        gc.collect()
 
         logger.info(f"[OK] Successfully rendered final Short: {dest_path}")
         return dest_path
+

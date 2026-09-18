@@ -44,9 +44,9 @@ ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "").strip()
 ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")
 
 # Video Settings
-VIDEO_WIDTH = int(os.getenv("VIDEO_WIDTH", "1080"))
-VIDEO_HEIGHT = int(os.getenv("VIDEO_HEIGHT", "1920"))
-VIDEO_FPS = int(os.getenv("VIDEO_FPS", "30"))
+VIDEO_WIDTH = int(os.getenv("VIDEO_WIDTH", "720"))
+VIDEO_HEIGHT = int(os.getenv("VIDEO_HEIGHT", "1280"))
+VIDEO_FPS = int(os.getenv("VIDEO_FPS", "24"))
 MAX_DURATION_SECONDS = int(os.getenv("MAX_DURATION_SECONDS", "15"))
 NUM_SCENES = int(os.getenv("NUM_SCENES", "5"))
 

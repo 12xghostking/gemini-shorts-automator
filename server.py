@@ -141,6 +141,8 @@ def run_pipeline_task(
         state.is_busy = False
         state.current_task = None
         state.lock.release()
+        import gc
+        gc.collect()
 
 def scheduler_worker():
     """Background worker that triggers generation every hour (24 times/day)."""

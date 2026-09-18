@@ -251,104 +251,117 @@ class VideoEngine:
         fps: int = 24
     ) -> Path:
         """
-        Transforms 5-6 distinct scene images into a seamless cinematic video montage:
+        Transforms distinct scene images into a seamless cinematic video montage using
+        single-pass low-memory rendering (optimized for 512MB RAM cloud containers):
         - Alternates camera panning/zooming styles (Push-in, Pan Right, Tilt-Up, Pull-out, Orbit Drift).
         - Renders atmospheric floating embers and dust particles.
-        - Concatenates into a single 9:16 vertical MP4 video.
+        - Employs single-clip evaluation with preset='ultrafast' and threads=1 to prevent OOM.
         """
-        try:
-            from moviepy import VideoClip, concatenate_videoclips
-        except ImportError:
-            from moviepy.editor import VideoClip, concatenate_videoclips
+        import gc
+        gc.collect()
 
-        target_w, target_h = 720, 1280
+        try:
+            from moviepy import VideoClip
+        except ImportError:
+            from moviepy.editor import VideoClip
+
+        target_w, target_h = config.VIDEO_WIDTH, config.VIDEO_HEIGHT
         num_shots = len(image_paths)
         shot_duration = max(2.0, total_duration / max(1, num_shots))
+        actual_total_duration = shot_duration * num_shots
 
         # Dynamic motion choreographies for distinct images
         motion_choreography = ["push_in", "pan_right", "tilt_up", "pull_out", "hero_drift", "push_in"]
 
         # Precompute floating atmospheric embers / starlight
-        num_particles = 28
+        num_particles = 22
         particles = [
             {
                 "x": random.uniform(0, target_w),
                 "y": random.uniform(0, target_h),
-                "vx": random.uniform(-10, 10),
-                "vy": random.uniform(35, 70),
-                "size": random.randint(2, 5),
+                "vx": random.uniform(-8, 8),
+                "vy": random.uniform(30, 60),
+                "size": random.randint(2, 4),
                 "color": random.choice([(255, 195, 70), (255, 120, 40), (120, 225, 255), (255, 255, 255)])
             }
             for _ in range(num_particles)
         ]
 
-        clips = []
-        for idx, img_path in enumerate(image_paths):
-            base_img = Image.open(str(img_path)).convert("RGB").resize((target_w, target_h), Image.Resampling.LANCZOS)
-            motion = motion_choreography[idx % len(motion_choreography)]
+        # Pre-scale base images to target resolution
+        base_images = [
+            Image.open(str(p)).convert("RGB").resize((target_w, target_h), Image.Resampling.LANCZOS)
+            for p in image_paths
+        ]
 
-            def make_frame_factory(src_img, motion_type, scene_idx):
-                def make_frame(t):
-                    progress = min(1.0, max(0.0, t / shot_duration))
+        def make_frame(t):
+            scene_idx = min(num_shots - 1, int(t / shot_duration))
+            local_t = t - (scene_idx * shot_duration)
+            progress = min(1.0, max(0.0, local_t / shot_duration))
+            src_img = base_images[scene_idx]
+            motion_type = motion_choreography[scene_idx % len(motion_choreography)]
 
-                    if motion_type == "push_in":
-                        scale = 1.0 + 0.15 * progress
-                        pan_x, pan_y = 0, 0
-                    elif motion_type == "pan_right":
-                        scale = 1.12
-                        pan_x = int(32.0 * (2.0 * progress - 1.0))
-                        pan_y = 0
-                    elif motion_type == "tilt_up":
-                        scale = 1.10
-                        pan_x = 0
-                        pan_y = int(32.0 * (1.0 - 2.0 * progress))
-                    elif motion_type == "pull_out":
-                        scale = 1.17 - 0.15 * progress
-                        pan_x, pan_y = 0, 0
-                    else:  # hero_drift
-                        scale = 1.04 + 0.10 * progress
-                        pan_x = int(4.0 * math.sin(progress * math.pi * 2))
-                        pan_y = int(3.0 * math.cos(progress * math.pi * 2))
+            if motion_type == "push_in":
+                scale = 1.0 + 0.15 * progress
+                pan_x, pan_y = 0, 0
+            elif motion_type == "pan_right":
+                scale = 1.12
+                pan_x = int(30.0 * (2.0 * progress - 1.0))
+                pan_y = 0
+            elif motion_type == "tilt_up":
+                scale = 1.10
+                pan_x = 0
+                pan_y = int(30.0 * (1.0 - 2.0 * progress))
+            elif motion_type == "pull_out":
+                scale = 1.17 - 0.15 * progress
+                pan_x, pan_y = 0, 0
+            else:  # hero_drift
+                scale = 1.04 + 0.10 * progress
+                pan_x = int(4.0 * math.sin(progress * math.pi * 2))
+                pan_y = int(3.0 * math.cos(progress * math.pi * 2))
 
-                    crop_w = int(target_w / scale)
-                    crop_h = int(target_h / scale)
+            crop_w = int(target_w / scale)
+            crop_h = int(target_h / scale)
 
-                    left = max(0, min(target_w - crop_w, (target_w - crop_w) // 2 + pan_x))
-                    top = max(0, min(target_h - crop_h, (target_h - crop_h) // 2 + pan_y))
+            left = max(0, min(target_w - crop_w, (target_w - crop_w) // 2 + pan_x))
+            top = max(0, min(target_h - crop_h, (target_h - crop_h) // 2 + pan_y))
 
-                    cropped = src_img.crop((left, top, left + crop_w, top + crop_h))
-                    frame = cropped.resize((target_w, target_h), Image.Resampling.BILINEAR)
+            cropped = src_img.crop((left, top, left + crop_w, top + crop_h))
+            frame = cropped.resize((target_w, target_h), Image.Resampling.BILINEAR)
 
-                    # Dynamic atmospheric lighting breathing
-                    brightness = 1.0 + 0.03 * math.sin(t * 2.5 + scene_idx)
-                    if brightness != 1.0:
-                        frame = ImageEnhance.Brightness(frame).enhance(brightness)
+            # Dynamic atmospheric lighting breathing
+            brightness = 1.0 + 0.03 * math.sin(local_t * 2.5 + scene_idx)
+            if brightness != 1.0:
+                frame = ImageEnhance.Brightness(frame).enhance(brightness)
 
-                    # Draw floating embers / starlight
-                    draw = ImageDraw.Draw(frame)
-                    for p in particles:
-                        py = int((p["y"] - p["vy"] * (t + scene_idx * shot_duration)) % target_h)
-                        px = int((p["x"] + p["vx"] * (t + scene_idx * shot_duration) + 5.0 * math.sin(t * 2.0)) % target_w)
-                        sz = p["size"]
-                        draw.ellipse([px, py, px + sz, py + sz], fill=p["color"])
+            # Draw floating embers / starlight
+            draw = ImageDraw.Draw(frame)
+            for p in particles:
+                py = int((p["y"] - p["vy"] * t) % target_h)
+                px = int((p["x"] + p["vx"] * t + 4.0 * math.sin(t * 2.0)) % target_w)
+                sz = p["size"]
+                draw.ellipse([px, py, px + sz, py + sz], fill=p["color"])
 
-                    return np.array(frame)
-                return make_frame
+            return np.array(frame)
 
-            clip = VideoClip(make_frame_factory(base_img, motion, idx), duration=shot_duration)
-            clips.append(clip)
-
-        logger.info(f"[COMPOSER] Assembling {len(clips)} distinct scene clips into master montage...")
+        logger.info(f"[COMPOSER] Rendering {num_shots} scenes into master montage (Low-RAM Single-Pass Mode)...")
         dest_video_path.parent.mkdir(parents=True, exist_ok=True)
-        final_video = concatenate_videoclips(clips, method="compose")
+        final_video = VideoClip(make_frame, duration=actual_total_duration)
         final_video.write_videofile(
             str(dest_video_path),
             fps=fps,
             codec="libx264",
+            preset="ultrafast",
+            threads=1,
+            ffmpeg_params=["-pix_fmt", "yuv420p"],
             audio=False,
             logger=None
         )
-        logger.info(f"[OK] Multi-Image Storytelling Montage created: {dest_video_path} (Duration: {final_video.duration}s)")
+        final_video.close()
+        del final_video
+        del base_images
+        gc.collect()
+
+        logger.info(f"[OK] Multi-Image Storytelling Montage created: {dest_video_path} (Duration: {actual_total_duration}s)")
         return dest_video_path
 
     def _generate_procedural_poster(self, dest_path: Path, prompt_text: str) -> Path:
