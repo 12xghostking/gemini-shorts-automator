@@ -150,6 +150,7 @@ class VideoComposer:
             audio_codec="aac",
             preset="medium",
             threads=4,
+            ffmpeg_params=["-pix_fmt", "yuv420p"],
             logger=None
         )
 

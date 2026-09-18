@@ -21,6 +21,7 @@ output/final/*
 !output/final/.gitkeep
 output/images/*
 !output/images/.gitkeep
+output/used_concepts.json
 temp-audio.m4a
 
 

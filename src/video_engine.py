@@ -84,7 +84,7 @@ class VideoEngine:
                 for idx, url in enumerate(horde_urls):
                     dest_img = config.IMAGES_DIR / f"img_{base_timestamp}_scene{idx + 1}.jpg"
                     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-                    with urllib.request.urlopen(req, timeout=20) as resp:
+                    with urllib.request.urlopen(req, timeout=25) as resp:
                         img = Image.open(resp).convert("RGB")
                         img = img.resize((720, 1280), Image.Resampling.LANCZOS)
                         img.save(str(dest_img), "JPEG", quality=95)
@@ -93,9 +93,9 @@ class VideoEngine:
         except Exception as e:
             logger.warning(f"   [AI IMAGES] AI Horde batch generation error: {e}")
 
-        # Method 2: Fallback via Pollinations if AI Horde was unavailable or returned < 2 images
+        # Method 2: Resilient retry loop with backoff via Pollinations for any remaining scenes
         if len(image_paths) < count:
-            logger.info(f"   [AI IMAGES] Generating remaining scenes via Pollinations...")
+            logger.info(f"   [AI IMAGES] Generating remaining {count - len(image_paths)} distinct scenes...")
             scene_modifiers = [
                 "wide panoramic establishing shot, dark storm clouds, volumetric god rays",
                 "intense macro close-up portrait, glowing eyes, intricate armor details",
@@ -113,33 +113,57 @@ class VideoEngine:
                 modifier = scene_modifiers[idx % len(scene_modifiers)]
                 clean_p = f"{core}, {modifier}, vertical 9:16 framing, photorealistic, 8k"
 
-                try:
-                    seed = random.randint(1000, 999999)
-                    encoded_p = urllib.parse.quote(clean_p)
-                    url = f"https://image.pollinations.ai/prompt/{encoded_p}?width=720&height=1280&nologo=true&seed={seed}"
-                    req = urllib.request.Request(url, headers={"User-Agent": f"Mozilla/5.0 App/{seed % 100}"})
-                    with urllib.request.urlopen(req, timeout=18) as resp:
-                        img = Image.open(resp).convert("RGB")
-                        w, h = img.size
-                        if h > 50:
-                            img = img.crop((0, 0, w, h - 45))
-                            img = img.resize((720, 1280), Image.Resampling.LANCZOS)
-                        img.save(str(dest_img), "JPEG", quality=95)
-                        image_paths.append(dest_img)
-                        logger.info(f"   [SCENE {idx + 1}/{count}] Saved distinct image to {dest_img.name}")
-                except Exception as e:
-                    logger.warning(f"   [SCENE {idx + 1}] Pollinations error: {e}")
-                    # If network was rate-limited, create an artistic angle variation
-                    if image_paths:
-                        self._create_storyboard_angle(image_paths[0], dest_img, angle_idx=idx)
-                        image_paths.append(dest_img)
-                    else:
-                        self._generate_procedural_poster(dest_img, core)
-                        image_paths.append(dest_img)
+                # Retry up to 4 attempts with exponential backoff on 429 or timeout
+                success = False
+                for attempt in range(1, 5):
+                    if attempt > 1:
+                        wait_seconds = attempt * 8
+                        logger.info(f"   [SCENE {idx + 1}] Waiting {wait_seconds}s before retry {attempt}/4 to prevent rate limiting...")
+                        time.sleep(wait_seconds)
+                    elif i > 0:
+                        # Polite spacing between scene requests
+                        time.sleep(4)
+
+                    try:
+                        seed = random.randint(1000, 999999)
+                        encoded_p = urllib.parse.quote(clean_p)
+                        url = f"https://image.pollinations.ai/prompt/{encoded_p}?width=720&height=1280&nologo=true&seed={seed}"
+                        req = urllib.request.Request(
+                            url,
+                            headers={"User-Agent": f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) ShortsBot/{seed % 100}"}
+                        )
+                        with urllib.request.urlopen(req, timeout=30) as resp:
+                            img = Image.open(resp).convert("RGB")
+                            w, h = img.size
+                            if h > 50:
+                                img = img.crop((0, 0, w, h - 45))
+                                img = img.resize((720, 1280), Image.Resampling.LANCZOS)
+                            img.save(str(dest_img), "JPEG", quality=95)
+                            image_paths.append(dest_img)
+                            logger.info(f"   [SCENE {idx + 1}/{count}] Saved distinct image to {dest_img.name}")
+                            success = True
+                            break
+                    except Exception as e:
+                        logger.warning(f"   [SCENE {idx + 1} attempt {attempt}/4] Generation attempt error: {e}")
+
+                if not success:
+                    # As absolute last resort, fetch a single rapid AI Horde image for this scene
+                    logger.info(f"   [SCENE {idx + 1}] Requesting single scene fallback from distributed cluster...")
+                    try:
+                        single_urls = self._fetch_horde_batch(clean_p, count=1, max_wait_seconds=45)
+                        if single_urls:
+                            sreq = urllib.request.Request(single_urls[0], headers={"User-Agent": "Mozilla/5.0"})
+                            with urllib.request.urlopen(sreq, timeout=20) as sresp:
+                                img = Image.open(sresp).convert("RGB").resize((720, 1280), Image.Resampling.LANCZOS)
+                                img.save(str(dest_img), "JPEG", quality=95)
+                                image_paths.append(dest_img)
+                                logger.info(f"   [SCENE {idx + 1}/{count}] Saved distinct fallback image to {dest_img.name}")
+                    except Exception as he:
+                        logger.warning(f"   [SCENE {idx + 1}] Single cluster fallback failed: {he}")
 
         return image_paths
 
-    def _fetch_horde_batch(self, prompt: str, count: int = 5) -> List[str]:
+    def _fetch_horde_batch(self, prompt: str, count: int = 5, max_wait_seconds: int = 105) -> List[str]:
         """Submits a batch generation job to AI Horde and waits for completed image URLs."""
         url = "https://aihorde.net/api/v2/generate/async"
         payload = json.dumps({
@@ -150,7 +174,7 @@ class VideoEngine:
         headers = {
             "Content-Type": "application/json",
             "apikey": "0000000000",
-            "User-Agent": "ShortsAutomator/1.0"
+            "User-Agent": "ShortsAutomator/2.0"
         }
 
         req = urllib.request.Request(url, data=payload, headers=headers)
@@ -161,15 +185,22 @@ class VideoEngine:
         if not job_id:
             return []
 
-        # Poll status every 2 seconds for up to 35 seconds
-        for _ in range(18):
-            time.sleep(2)
+        # Poll status every 3 seconds up to max_wait_seconds
+        num_polls = max(10, max_wait_seconds // 3)
+        for poll_i in range(num_polls):
+            time.sleep(3)
             check_url = f"https://aihorde.net/api/v2/generate/check/{job_id}"
             creq = urllib.request.Request(check_url, headers=headers)
             try:
                 with urllib.request.urlopen(creq, timeout=10) as cresp:
                     cdata = json.loads(cresp.read().decode())
-                    if cdata.get("done"):
+                    done = cdata.get("done")
+                    finished = cdata.get("finished", 0)
+                    proc = cdata.get("processing", 0)
+                    wait = cdata.get("waiting", 0)
+                    if (poll_i + 1) % 4 == 0 or done:
+                        logger.info(f"   [AI HORDE] Cluster status: {finished}/{count} ready (processing: {proc}, waiting: {wait})")
+                    if done or (finished and finished >= count):
                         break
             except Exception:
                 pass
@@ -180,34 +211,6 @@ class VideoEngine:
         with urllib.request.urlopen(sreq, timeout=15) as sresp:
             sdata = json.loads(sresp.read().decode())
             return [g.get("img") for g in sdata.get("generations", []) if g.get("img")]
-
-    def _create_storyboard_angle(self, master_image_path: Path, dest_path: Path, angle_idx: int) -> Path:
-        """Creates an artistic framing angle variation if an API call was dropped."""
-        master = Image.open(str(master_image_path)).convert("RGB")
-        w, h = 720, 1280
-        master = master.resize((w, h), Image.Resampling.LANCZOS)
-
-        if angle_idx == 1:
-            crop_w, crop_h = int(w / 1.45), int(h / 1.45)
-            framed = master.crop(((w - crop_w) // 2, int(h * 0.15), (w - crop_w) // 2 + crop_w, int(h * 0.15) + crop_h))
-            framed = ImageEnhance.Contrast(framed).enhance(1.08)
-        elif angle_idx == 2:
-            crop_w, crop_h = int(w / 1.35), int(h / 1.35)
-            framed = master.crop((int(w * 0.20), int(h * 0.25), int(w * 0.20) + crop_w, int(h * 0.25) + crop_h))
-            framed = ImageEnhance.Color(framed).enhance(1.12)
-        elif angle_idx == 3:
-            crop_w, crop_h = int(w / 1.25), int(h / 1.25)
-            framed = master.crop((int(w * 0.05), int(h * 0.05), int(w * 0.05) + crop_w, int(h * 0.05) + crop_h))
-        elif angle_idx == 4:
-            crop_w, crop_h = int(w / 1.30), int(h / 1.30)
-            framed = master.crop(((w - crop_w) // 2, int(h * 0.20), (w - crop_w) // 2 + crop_w, int(h * 0.20) + crop_h))
-            framed = ImageEnhance.Brightness(framed).enhance(1.04)
-        else:
-            framed = master
-
-        framed = framed.resize((w, h), Image.Resampling.LANCZOS)
-        framed.save(str(dest_path), "JPEG", quality=95)
-        return dest_path
 
     def _render_multi_image_cinematic_video(
         self,

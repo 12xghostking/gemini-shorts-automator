@@ -324,28 +324,50 @@ LIGHTING_AND_STYLE = [
     "Hyper-realistic 9:16 vertical shot, low-angle hero framing, golden hour solar illumination, floating dust particles, blockbuster movie aesthetic."
 ]
 
-HOOK_TEMPLATES = [
-    "When darkness consumed the mortal realm, only the {name} dared to defy fate.",
-    "Ancient scrolls warned of this exact day. Watch what happens when the {name} awakens.",
-    "In a battle where a single mistake means oblivion, honor is measured in nanoseconds.",
-    "They believed the legends were just myths. Until the skies turned dark and the {name} appeared.",
-    "Deep beyond where sunlight dares to reach, ancient power waits for those worthy enough to wield it.",
-    "They said this titan could never be stopped. But they forgot who was standing in their way.",
-    "When the heavens shattered, one warrior stood alone against the encroaching abyss.",
-    "Legends said one strike could sever destiny itself. Watch closely before it happens.",
-    "Only once every thousand years does this power awaken. Witness the true wrath of the {name}.",
-    "When all hope was lost, the shadows parted to reveal something far more terrifying."
+VOICEOVER_NARRATIVES = [
+    "In the forgotten age of warriors, the {name} swore an unbreakable oath. Armed with {weapon}, they stood as the realm's last defense. When shadows struck, they unleashed {power}—reminding the world why some legends must never be challenged.",
+    "Ancient prophecies warned of the day the {name} would awaken. With {weapon} drawn, they took their stance. Unleashing {power}, the very foundation of reality trembled. Watch closely before history is rewritten.",
+    "In a battle where a single mistake means oblivion, the {name} never hesitates. Gripping {weapon}, they charged headfirst into the storm. Through {power}, victory was claimed in less than a heartbeat.",
+    "When all hope was abandoned, one lone warrior refused to bow: the {name}. Standing firm with {weapon}, they met the advancing horde. Channeling {power}, they turned the battlefield into blinding starlight.",
+    "They said this battle was already lost. But they forgot who ruled the frontlines: the {name}. Drawing {weapon} in blinding silence, they unleashed {power}. In seconds, centuries of darkness collapsed into dust.",
+    "Only once every thousand years does a strike like this occur. The legendary {name} raised {weapon} towards the sky. Channeling {power}, they tore through the enemy lines with godlike fury.",
+    "Mortals believed the tales were just myths—until the {name} descended. Wielding {weapon}, they brought divine retribution to the battlefield. One blast of {power}, and the encroaching shadows were banished forever.",
+    "Surrounded on all sides, any normal fighter would falter. But the {name} is built for the impossible. Gripping {weapon} with iron resolve, they unleashed {power}. Witness the wrath of an undefeated titan.",
+    "From the highest peaks to the deepest shadows, the name of the {name} commands absolute reverence. Empowered by {weapon}, they ignited {power}. Tell us in the comments: who could ever stop them?",
+    "When empires crumble, only true legends stand tall. The {name} took their final stance with {weapon}. Channeling {power}, they pushed back the abyss when everyone said it couldn't be done.",
+    "The skies turned pitch black as the {name} stepped forward into the fray. With {weapon} crackling in their hands, they unleashed {power}. A strike so pure, it echoed across the mortal realm.",
+    "Trained in absolute secrecy, the {name} only emerges when the world teeters on the edge of destruction. With {weapon} at the ready, they channeled {power}. Nothing in their path was left standing.",
+    "Destiny called, and the {name} answered without fear. Locking eyes with the enemy, they drew {weapon}. Through {power}, fate itself was severed in a fraction of a second.",
+    "Some warriors rely on armor. The {name} relies on pure, unstoppable will. Raising {weapon} high, they ignited {power}, shattering the battlefield into blazing embers.",
+    "Long after the clash ends, the legend of the {name} will echo through eternity. Armed with {weapon}, they channeled {power}. Watch until the end to see true supremacy.",
+    "Before anyone could even react, the {name} had already struck. Wielding {weapon} with surgical precision, they activated {power}. In the blink of an eye, the duel was over.",
+    "A celestial aura engulfed the battlefield as the {name} revealed their true form. Gripping {weapon}, they unleashed {power}. This is what peak power looks like.",
+    "Carrying the spirits of all who came before, the {name} stepped into the fray. With {weapon} ignited, they channeled {power}. Honor never dies.",
+    "They studied the art of war for centuries, reaching perfection as the {name}. Bearing {weapon}, they unleashed {power}—leaving spectators in absolute awe.",
+    "This is the moment everything changed. The {name} unleashed the full might of {weapon}. Channeling {power}, they etched their name into legend forever."
 ]
 
 TITLE_TEMPLATES = [
-    "The {name} Awakens! #Shorts",
-    "When The {name} Strikes! #Shorts",
-    "Legendary {name} Showdown #Shorts",
-    "The Strike That Shattered Fate #Shorts",
-    "No One Saw This Coming! #Shorts",
-    "The Power of the {name} #Shorts",
-    "The Final Duel Begins #Shorts",
-    "Ancient {name} Unleashed #Shorts"
+    "The {name} Awakens! ⚔️ #Shorts",
+    "When The {name} Strikes! ⚡ #Shorts",
+    "Legendary {name} Showdown 🔥 #Shorts",
+    "The Strike That Made The {name} Legendary #Shorts",
+    "No One Could Stop The {name}! #Shorts",
+    "The True Power of The {name} #Shorts",
+    "The {name}'s Final Clash! 🛡️ #Shorts",
+    "Ancient {name} Unleashed! 💥 #Shorts",
+    "The Day The {name} Appeared #Shorts",
+    "Could You Survive The {name}? #Shorts",
+    "The {name} Defies Destiny! #Shorts",
+    "Wrath of The {name} Revealed #Shorts",
+    "The Strike That Shattered The Realm: {name} #Shorts",
+    "Witness The Power of The {name}! #Shorts",
+    "When The {name} Enters The Battlefield #Shorts",
+    "The Secret Technique of The {name} #Shorts",
+    "The Undefeated {name} Strikes Again #Shorts",
+    "The {name}'s Legendary Duel #Shorts",
+    "Why The {name} Was Feared By Everyone #Shorts",
+    "The {name} Unleashes Ancient Wrath #Shorts"
 ]
 
 def generate_5000_concepts(output_file: Path, concepts_per_archetype: int = 20):
@@ -364,8 +386,8 @@ def generate_5000_concepts(output_file: Path, concepts_per_archetype: int = 20):
             env = ENVIRONMENTS[(arch_idx * 7 + i) % len(ENVIRONMENTS)]
             act = ACTIONS[(arch_idx * 5 + i) % len(ACTIONS)]
             style = LIGHTING_AND_STYLE[(arch_idx * 3 + i) % len(LIGHTING_AND_STYLE)]
-            hook = HOOK_TEMPLATES[(arch_idx * 11 + i) % len(HOOK_TEMPLATES)].format(name=name)
-            title = TITLE_TEMPLATES[(arch_idx * 13 + i) % len(TITLE_TEMPLATES)].format(name=name)
+            hook = VOICEOVER_NARRATIVES[i % len(VOICEOVER_NARRATIVES)].format(name=name, weapon=weapon, power=power)
+            title = TITLE_TEMPLATES[(arch_idx * 3 + i) % len(TITLE_TEMPLATES)].format(name=name)
 
             prompt = (
                 f"Cinematic vertical 9:16 framing. A legendary {name} wielding {weapon} {env}. "

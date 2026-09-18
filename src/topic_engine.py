@@ -51,6 +51,7 @@ class ShortConcept(BaseModel):
 class TopicEngine:
     def __init__(self, api_key: Optional[str] = None):
         self.concepts_bank_path = config.ASSETS_DIR / "concepts_bank.json"
+        self.used_concepts_path = config.OUTPUT_DIR / "used_concepts.json"
         self.concepts: List[dict] = []
         self._load_bank()
 
@@ -66,12 +67,31 @@ class TopicEngine:
         else:
             logger.warning("concepts_bank.json not found. Running with fallback generator.")
 
+    def _load_used_concepts(self) -> set:
+        if self.used_concepts_path.exists():
+            try:
+                with open(self.used_concepts_path, "r", encoding="utf-8") as f:
+                    return set(json.load(f))
+            except Exception:
+                return set()
+        return set()
+
+    def _mark_used(self, title: str):
+        used = self._load_used_concepts()
+        used.add(title)
+        try:
+            with open(self.used_concepts_path, "w", encoding="utf-8") as f:
+                json.dump(list(used), f, indent=2)
+        except Exception as e:
+            logger.warning(f"Could not save used concept: {e}")
+
     def generate_concept(self, category: Optional[str] = None) -> ShortConcept:
         """
         Instantly selects a unique concept from the 5,000+ database,
-        guaranteeing zero 503 API downtime and instant response.
+        guaranteeing zero repeated voiceovers and instant response.
         """
         chosen_category = (category or "").strip()
+        used = self._load_used_concepts()
 
         # If user specified a category (e.g. "paladin", "samurai", "dragon")
         if chosen_category and self.concepts:
@@ -85,12 +105,17 @@ class TopicEngine:
                 or any(query in t.lower() for t in c.get("tags", []))
             ]
             if matched:
-                selected = random.choice(matched)
+                # Prioritize concepts that haven't been used yet
+                unused = [c for c in matched if c.get("concept_title") not in used]
+                selected = random.choice(unused if unused else matched)
+                self._mark_used(selected.get("concept_title", ""))
                 return ShortConcept(**selected)
 
-        # If no specific category or no match in bank, pick randomly from the 5,000
+        # If no specific category or no match in bank, pick from unused in the 5,000
         if self.concepts:
-            selected = random.choice(self.concepts)
+            unused = [c for c in self.concepts if c.get("concept_title") not in used]
+            selected = random.choice(unused if unused else self.concepts)
+            self._mark_used(selected.get("concept_title", ""))
             return ShortConcept(**selected)
 
         # Dynamic algorithmic fallback if bank is not present
