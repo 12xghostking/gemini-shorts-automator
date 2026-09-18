@@ -114,23 +114,26 @@ class ShortsPipeline:
         }
 
     def start_scheduler(self):
-        """Runs the pipeline on a recurring schedule (e.g. 2-3 times daily)."""
+        """Runs the pipeline on an hourly schedule (24 uploads a day, 1 per hour)."""
         import schedule
 
-        logger.info(f"[SCHEDULER] Starting automated scheduler ({config.DAILY_TARGET_SHORTS} uploads/day)...")
-        # Default distribution: Morning, Afternoon, Evening
-        schedule.every().day.at("09:00").do(self.run_single)
-        schedule.every().day.at("14:30").do(self.run_single)
-        if config.DAILY_TARGET_SHORTS >= 3:
-            schedule.every().day.at("19:30").do(self.run_single)
+        logger.info(f"[SCHEDULER] Starting automated hourly scheduler ({config.DAILY_TARGET_SHORTS} uploads/day)...")
+        
+        # Schedule to run every hour at minute 0
+        schedule.every(1).hours.do(self.run_single)
 
-        logger.info("Scheduled upload times:")
-        logger.info(" - 09:00 AM")
-        logger.info(" - 02:30 PM")
-        if config.DAILY_TARGET_SHORTS >= 3:
-            logger.info(" - 07:30 PM")
-        logger.info("Running scheduler loop (Press Ctrl+C to stop)...")
+        logger.info("============================================================")
+        logger.info("[SCHEDULER] Active Schedule: 1 Short every hour (24x daily)")
+        logger.info("Executing initial run now...")
+        logger.info("============================================================")
 
+        # Trigger first run immediately
+        try:
+            self.run_single()
+        except Exception as e:
+            logger.error(f"[SCHEDULER] Error during initial run: {e}")
+
+        logger.info("[SCHEDULER] Running background loop. Next run in 60 minutes (Press Ctrl+C to stop)...")
         while True:
             schedule.run_pending()
             time.sleep(30)

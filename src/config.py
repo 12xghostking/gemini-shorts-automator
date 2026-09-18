@@ -53,4 +53,4 @@ NUM_SCENES = int(os.getenv("NUM_SCENES", "5"))
 
 # Pipeline Behavior
 DRY_RUN = os.getenv("DRY_RUN", "false").lower() in ("true", "1", "yes")
-DAILY_TARGET_SHORTS = int(os.getenv("DAILY_TARGET_SHORTS", "3"))
+DAILY_TARGET_SHORTS = int(os.getenv("DAILY_TARGET_SHORTS", "24"))
