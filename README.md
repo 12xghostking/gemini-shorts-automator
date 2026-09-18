@@ -216,5 +216,5 @@ python cli.py schedule
 4. Action: **Start a program**:
    - Program: `python.exe`
    - Arguments: `cli.py run-once --live`
-   - Start in: `c:\Users\sirki\projects\gemini-shorts-automator`
+   - Start in: `gemini-shorts-automator`
 
