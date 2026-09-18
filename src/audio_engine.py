@@ -1,20 +1,93 @@
 """Audio Engine for synthesizing voiceovers and handling background music."""
 
 import os
+import re
 import time
+import random
 import asyncio
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from src import config
 
 logger = logging.getLogger(__name__)
 
+# Curated profiles for dramatic, cinematic, non-robotic narration
+DRAMATIC_VOICE_PROFILES: Dict[str, Dict[str, str]] = {
+    "en-US-GuyNeural": {
+        "rate": "-4%",
+        "pitch": "-3Hz",
+        "name": "Guy (Movie Trailer Deep)"
+    },
+    "en-US-ChristopherNeural": {
+        "rate": "-4%",
+        "pitch": "-2Hz",
+        "name": "Christopher (Epic Lorekeeper)"
+    },
+    "en-GB-RyanNeural": {
+        "rate": "-3%",
+        "pitch": "-2Hz",
+        "name": "Ryan (British Fantasy Narrator)"
+    },
+    "en-US-EricNeural": {
+        "rate": "-3%",
+        "pitch": "-1Hz",
+        "name": "Eric (Intense Battlefield Action)"
+    },
+    "en-GB-ThomasNeural": {
+        "rate": "-5%",
+        "pitch": "-3Hz",
+        "name": "Thomas (Ancient Myth Chronicler)"
+    }
+}
+
+
+def format_dramatic_narration(text: str) -> str:
+    """Pre-processes narration text to introduce natural dramatic pauses, cadence, and tension,
+    preventing flat robotic reading in Edge-TTS.
+    """
+    cleaned = text.strip().strip('"').strip("'")
+
+    # Replace em-dashes and long dashes with anticipatory breath pauses
+    cleaned = re.sub(r'\s*[—–]{1,2}\s*', ' ... ', cleaned)
+
+    # Add breath pauses for dramatic conjunctions
+    for conj in ["reminding the world", "before the realm", "and in doing so"]:
+        if conj in cleaned and f" ... {conj}" not in cleaned:
+            cleaned = cleaned.replace(f" {conj}", f" ... {conj}")
+
+    # Punctuate colons and semicolons with natural pauses
+    cleaned = cleaned.replace(':', ' ... ').replace(';', ', ')
+
+    # Clean up excessive ellipsis or whitespace
+    cleaned = re.sub(r'\.{4,}', '...', cleaned)
+    cleaned = re.sub(r'\s+', ' ', cleaned)
+    return cleaned
+
+
 class AudioEngine:
     def __init__(self):
         self.engine = config.TTS_ENGINE
         self.voice = config.EDGE_TTS_VOICE
+        self.voice_pool = config.EDGE_TTS_VOICE_POOL
+        self.randomize_voices = config.RANDOMIZE_VOICES
+
+    def _select_voice_profile(self) -> Dict[str, str]:
+        """Selects a voice profile, randomizing across the pool if enabled."""
+        if self.randomize_voices or self.voice in ("random", "", "auto"):
+            voice_name = random.choice(self.voice_pool) if self.voice_pool else "en-US-GuyNeural"
+        else:
+            voice_name = self.voice
+
+        profile = DRAMATIC_VOICE_PROFILES.get(voice_name, {
+            "rate": "-4%",
+            "pitch": "-2Hz",
+            "name": f"{voice_name} (Custom)"
+        })
+        profile_copy = dict(profile)
+        profile_copy["voice"] = voice_name
+        return profile_copy
 
     def generate_voiceover(self, text: str, output_path: Optional[Path] = None) -> Path:
         """Generates voiceover narration using Edge-TTS or ElevenLabs."""
@@ -27,17 +100,30 @@ class AudioEngine:
             return self._generate_edge_tts(text, dest_path)
 
     def _generate_edge_tts(self, text: str, dest_path: Path) -> Path:
-        """Generates hyper-realistic neural voiceover using Edge TTS (free)."""
-        logger.info(f"[VOICE] Generating voiceover with Edge-TTS ({self.voice})...")
+        """Generates hyper-realistic neural voiceover using Edge TTS with dramatic cadence."""
+        profile = self._select_voice_profile()
+        voice_id = profile["voice"]
+        voice_label = profile.get("name", voice_id)
+        rate = profile.get("rate", "-4%")
+        pitch = profile.get("pitch", "-2Hz")
+
+        dramatic_text = format_dramatic_narration(text)
+
+        logger.info(f"[VOICE] Synthesizing voiceover with {voice_label} (Voice: {voice_id}, Rate: {rate}, Pitch: {pitch})...")
         try:
             import edge_tts
 
             async def _run():
-                communicate = edge_tts.Communicate(text, self.voice)
+                communicate = edge_tts.Communicate(
+                    dramatic_text,
+                    voice=voice_id,
+                    rate=rate,
+                    pitch=pitch
+                )
                 await communicate.save(str(dest_path))
 
             asyncio.run(_run())
-            logger.info(f"[OK] Voiceover saved at: {dest_path}")
+            logger.info(f"[OK] Dramatic voiceover saved at: {dest_path}")
             return dest_path
         except Exception as e:
             logger.warning(f"Edge-TTS synthesis failed: {e}. Generating silent placeholder audio.")

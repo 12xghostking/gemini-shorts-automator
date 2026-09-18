@@ -39,7 +39,14 @@ YOUTUBE_PRIVACY_STATUS = os.getenv("YOUTUBE_PRIVACY_STATUS", "public").lower()
 
 # TTS Settings
 TTS_ENGINE = os.getenv("TTS_ENGINE", "edge-tts").lower()
-EDGE_TTS_VOICE = os.getenv("EDGE_TTS_VOICE", "en-US-ChristopherNeural")
+EDGE_TTS_VOICE = os.getenv("EDGE_TTS_VOICE", "random")
+RANDOMIZE_VOICES = os.getenv("RANDOMIZE_VOICES", "true").lower() in ("true", "1", "yes")
+EDGE_TTS_VOICE_POOL = [
+    v.strip() for v in os.getenv(
+        "EDGE_TTS_VOICE_POOL",
+        "en-US-GuyNeural,en-US-ChristopherNeural,en-GB-RyanNeural,en-US-EricNeural,en-GB-ThomasNeural"
+    ).split(",") if v.strip()
+]
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "").strip()
 ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")
 
