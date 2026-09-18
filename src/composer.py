@@ -63,6 +63,8 @@ def _loop_audio(audio, duration):
 import shutil
 import subprocess
 import gc
+import re
+
 try:
     import imageio_ffmpeg
     DEFAULT_FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
@@ -71,6 +73,21 @@ except Exception:
 
 def _get_ffmpeg_bin():
     return shutil.which("ffmpeg") or DEFAULT_FFMPEG
+
+def get_media_duration(file_path: Path) -> float:
+    """Accurately returns media duration in seconds via FFmpeg with zero memory overhead."""
+    try:
+        ffmpeg_bin = _get_ffmpeg_bin()
+        if ffmpeg_bin and file_path.exists():
+            cmd = [ffmpeg_bin, "-i", str(file_path)]
+            res = subprocess.run(cmd, capture_output=True, text=True)
+            match = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.\d+)", res.stderr)
+            if match:
+                h, m, s = match.groups()
+                return int(h) * 3600 + int(m) * 60 + float(s)
+    except Exception:
+        pass
+    return 15.0
 
 
 class VideoComposer:
@@ -89,8 +106,8 @@ class VideoComposer:
     ) -> Path:
         """
         Assembles video, voiceover, and background music into a finished 9:16 Short.
-        Uses ultra-fast, zero-re-encoding FFmpeg stream copy (-c:v copy) to run in <15MB RAM.
-        Falls back to MoviePy if FFmpeg CLI is unavailable.
+        Precisely synchronizes video and audio durations with no looping or silent replays.
+        Uses ultra-fast FFmpeg stream copy (-c:v copy) in <15MB RAM.
         """
         timestamp = int(time.time())
         dest_filename = output_name or f"short_{timestamp}.mp4"
@@ -101,14 +118,16 @@ class VideoComposer:
         has_vo = voiceover_path and voiceover_path.exists()
         has_music = music_path and music_path.exists()
 
+        vo_duration = get_media_duration(voiceover_path) if has_vo else 15.0
+        final_duration = min(vo_duration + 0.5, float(config.MAX_DURATION_SECONDS))
+
         if ffmpeg_bin and has_vo:
-            logger.info(f"[COMPOSER] Using direct FFmpeg stream muxer (Zero-RAM copy mode)...")
+            logger.info(f"[COMPOSER] Using direct FFmpeg stream muxer (Target Duration: {final_duration:.1f}s)...")
             try:
                 if has_music:
-                    filter_complex = "[1:a]volume=1.0[vo];[2:a]volume=0.15[bg];[vo][bg]amix=inputs=2:duration=first:dropout_transition=2[aout]"
+                    filter_complex = "[1:a]volume=1.0[vo];[2:a]aloop=loop=-1:size=2e+09,volume=0.15[bg];[vo][bg]amix=inputs=2:duration=first:dropout_transition=0[aout]"
                     cmd = [
                         ffmpeg_bin, "-y",
-                        "-stream_loop", "-1",
                         "-i", str(video_path),
                         "-i", str(voiceover_path),
                         "-i", str(music_path),
@@ -118,13 +137,12 @@ class VideoComposer:
                         "-c:v", "copy",
                         "-c:a", "aac",
                         "-b:a", "192k",
-                        "-shortest",
+                        "-t", f"{final_duration:.2f}",
                         str(dest_path)
                     ]
                 else:
                     cmd = [
                         ffmpeg_bin, "-y",
-                        "-stream_loop", "-1",
                         "-i", str(video_path),
                         "-i", str(voiceover_path),
                         "-map", "0:v",
@@ -132,13 +150,13 @@ class VideoComposer:
                         "-c:v", "copy",
                         "-c:a", "aac",
                         "-b:a", "192k",
-                        "-shortest",
+                        "-t", f"{final_duration:.2f}",
                         str(dest_path)
                     ]
 
                 res = subprocess.run(cmd, capture_output=True, text=True)
                 if res.returncode == 0 and dest_path.exists() and dest_path.stat().st_size > 1000:
-                    logger.info(f"[OK] Successfully muxed final Short via FFmpeg: {dest_path} (Size: {dest_path.stat().st_size} bytes)")
+                    logger.info(f"[OK] Successfully muxed final Short ({final_duration:.1f}s) via FFmpeg: {dest_path}")
                     gc.collect()
                     return dest_path
                 else:

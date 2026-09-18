@@ -267,8 +267,8 @@ class VideoEngine:
 
         target_w, target_h = config.VIDEO_WIDTH, config.VIDEO_HEIGHT
         num_shots = len(image_paths)
-        shot_duration = max(2.0, total_duration / max(1, num_shots))
-        actual_total_duration = shot_duration * num_shots
+        shot_duration = total_duration / max(1, num_shots)
+        actual_total_duration = total_duration
 
         # Dynamic motion choreographies for distinct images
         motion_choreography = ["push_in", "pan_right", "tilt_up", "pull_out", "hero_drift", "push_in"]

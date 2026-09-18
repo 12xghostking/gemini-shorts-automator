@@ -49,15 +49,13 @@ class ShortsPipeline:
         music_path = self.audio_engine.get_background_music()
 
         # Calculate exact duration matching voiceover for seamless pacing
-        target_video_duration = 10.0
-        try:
-            from moviepy import AudioFileClip
-            if audio_path.exists():
-                vo_audio = AudioFileClip(str(audio_path))
-                target_video_duration = max(6.0, min(vo_audio.duration + 1.0, float(config.MAX_DURATION_SECONDS)))
-                vo_audio.close()
-        except Exception:
-            pass
+        target_video_duration = 15.0
+        if audio_path and audio_path.exists():
+            from src.composer import get_media_duration
+            vo_dur = get_media_duration(audio_path)
+            target_video_duration = max(6.0, min(vo_dur + 0.5, float(config.MAX_DURATION_SECONDS)))
+            logger.info(f"   [SYNC] Voiceover duration: {vo_dur:.1f}s -> Target Video Duration: {target_video_duration:.1f}s")
+
 
         # Step 3: Video Generation (Multi-Scene Free AI Storytelling Video Generation)
         logger.info(f"\n[3/5] Generating vertical video clip (Target duration: {target_video_duration}s)...")
