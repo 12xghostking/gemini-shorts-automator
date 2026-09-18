@@ -85,6 +85,42 @@ def run_once(category, dry_run, upload):
     console.print("[bold green]Pipeline execution completed successfully![/bold green]")
 
 @cli.command()
+@click.option("--file", "-f", default=None, help="Path to video file to upload (defaults to latest final Short)")
+@click.option("--title", "-t", default="Cyber Samurai Showdown in Neon Rain ⚔️ #Shorts #Cyberpunk", help="Video title")
+@click.option("--description", "-d", default="A lethal cyber samurai duel in neo-Tokyo under pouring neon rain. Created with Google Veo and Gemini. #Shorts #Cyberpunk #Veo", help="Description")
+@click.option("--privacy", "-p", default="unlisted", type=click.Choice(["public", "unlisted", "private"]), help="Upload privacy status")
+def upload(file, title, description, privacy):
+    """Upload a specific video file directly to YouTube using YouTube Data API v3."""
+    from src.youtube_engine import YouTubeEngine
+    from src import config
+    from pathlib import Path
+
+    if not file:
+        candidates = sorted(config.FINAL_VIDEO_DIR.glob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True)
+        if not candidates:
+            console.print("[bold red]No video files found in output/final/ to upload![/bold red]")
+            return
+        target_file = candidates[0]
+    else:
+        target_file = Path(file)
+
+    if not target_file.exists():
+        console.print(f"[bold red]File not found: {target_file}[/bold red]")
+        return
+
+    console.print(f"[bold cyan]Selected video for upload:[/bold cyan] {target_file.name}")
+    engine = YouTubeEngine()
+    result = engine.upload_short(
+        video_path=target_file,
+        title=title,
+        description=description,
+        tags=["Shorts", "Cyberpunk", "Samurai", "Veo", "AIArt", "Cinematic"],
+        privacy_status=privacy,
+        dry_run=False
+    )
+    console.print(f"[bold green]Upload Result: {result}[/bold green]")
+
+@cli.command()
 def schedule():
     """Start continuous 2-3x daily background scheduler."""
     from src.pipeline import ShortsPipeline
