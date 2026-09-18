@@ -1,9 +1,10 @@
-"""Topic and Prompt Engine using Google Gemini to brainstorm dynamic viral concepts."""
+"""Topic and Prompt Engine using a bank of 5,000+ unique cinematic Short concepts."""
 
 import json
 import random
 import logging
-from typing import Dict, Any, Optional
+from pathlib import Path
+from typing import Optional, List
 from pydantic import BaseModel, Field
 
 from src import config
@@ -13,12 +14,14 @@ logger = logging.getLogger(__name__)
 # Default rotating categories for dynamic variety
 VIRAL_NICHES = [
     "Mythical Dragons & Flying Titans",
-    "Cyberpunk & Feudal Samurai Duels",
-    "Ancient Celestial Gods & Beings",
+    "Cyberpunk & Feudal Warriors",
+    "Holy Warriors & Crusaders",
     "Deep Sea Bioluminescent Leviathans",
-    "Post-Apocalyptic Mecha Guardians",
-    "Surreal Elemental Magic & Portals",
-    "Galactic Nebula Explorers",
+    "Futuristic Mecha & Sci-Fi Warfare",
+    "Ancient Titans & Primordials",
+    "Cosmic Entities & Nebula Gods",
+    "Shadow Assassins & Rogues",
+    "Norse Mythology & Raiders",
 ]
 
 class ShortConcept(BaseModel):
@@ -28,138 +31,66 @@ class ShortConcept(BaseModel):
     voiceover_script: str = Field(description="10-25 word gripping narrative hook")
     youtube_title: str = Field(description="Catchy Short title including #Shorts")
     youtube_description: str
-    tags: list[str]
-
-
-FALLBACK_CONCEPTS = [
-    ShortConcept(
-        category="Mythical Dragons & Flying Titans",
-        concept_title="Obsidian Dragon Breaking The Storm",
-        video_prompt=(
-            "Cinematic vertical 9:16 shot. A colossal obsidian dragon with glowing molten-gold veins "
-            "soars dynamically through thunderous dark storm clouds, breathing a helix of blue lightning into the night sky. "
-            "Epic scale, dynamic low-angle tracking camera, hyper-detailed scales, rain droplets reacting to heat, photorealistic 8k render."
-        ),
-        voiceover_script="Ancient legends spoke of a storm dragon whose roar could ignite the night sky. What if the legends were real?",
-        youtube_title="The Storm Dragon Has Awakened! ⚡🐉 #Shorts #Fantasy",
-        youtube_description="Witness the awakening of the Obsidian Storm Dragon as it pierces through the celestial tempest. Subscribe for daily mythical encounters!",
-        tags=["Shorts", "Dragon", "Fantasy", "AIArt", "Cinematic", "Mythology", "Veo"]
-    ),
-    ShortConcept(
-        category="Cyberpunk & Feudal Samurai Duels",
-        concept_title="Neon Rain Duel of Two Master Blades",
-        video_prompt=(
-            "Cinematic vertical 9:16 framing. Two futuristic cyber-samurai facing each other on a wet skyscraper rooftop under neon rain. "
-            "One draws a katana crackling with crimson plasma. Rapid camera arc motion, reflective puddle splashes, holographic billboards in background, hyper-realistic."
-        ),
-        voiceover_script="In the year 2099, honor is measured in nanoseconds. Only one blade will strike true.",
-        youtube_title="Cyber Samurai Showdown in Neon Rain ⚔️🌧️ #Shorts #Cyberpunk",
-        youtube_description="A lethal encounter in neo-Tokyo under pouring neon rain. Who survives the duel? Drop your prediction below!",
-        tags=["Shorts", "Samurai", "Cyberpunk", "Katana", "Futuristic", "CGI", "Epic"]
-    ),
-    ShortConcept(
-        category="Deep Sea Bioluminescent Leviathans",
-        concept_title="The Abyssal Kraken of the Marianas",
-        video_prompt=(
-            "Cinematic vertical 9:16 framing. A deep-sea glowing bioluminescent kraken emerging from the darkest abyss. "
-            "Ethereal cyan and violet tendrils pulsing with light, drifting marine snow, slow motion underwater camera drift, photorealistic BBC planet earth style."
-        ),
-        voiceover_script="Miles beneath the ocean surface, ancient leviathans lurk where sunlight has never dared to reach.",
-        youtube_title="Deepest Leviathan Ever Recorded? 🌊🐙 #Shorts #DeepSea",
-        youtube_description="What hides at the bottom of the Mariana Trench? Meet the bioluminescent lord of the abyss.",
-        tags=["Shorts", "DeepSea", "Ocean", "Creature", "Bioluminescence", "Mystery"]
-    )
-]
+    tags: List[str]
 
 
 class TopicEngine:
     def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or config.GEMINI_API_KEY
-        self.client = None
-        if self.api_key:
+        self.concepts_bank_path = config.ASSETS_DIR / "concepts_bank.json"
+        self.concepts: List[dict] = []
+        self._load_bank()
+
+    def _load_bank(self):
+        """Loads the 5,000+ concept offline database for instant, zero-failure concept generation."""
+        if self.concepts_bank_path.exists():
             try:
-                from google import genai
-                self.client = genai.Client(api_key=self.api_key)
+                with open(self.concepts_bank_path, "r", encoding="utf-8") as f:
+                    self.concepts = json.load(f)
+                logger.info(f"[TOPIC ENGINE] Loaded {len(self.concepts)} unique concepts from bank.")
             except Exception as e:
-                logger.warning(f"Could not initialize Google GenAI client: {e}")
+                logger.warning(f"Failed to load concepts_bank.json: {e}")
+        else:
+            logger.warning("concepts_bank.json not found. Running with fallback generator.")
 
     def generate_concept(self, category: Optional[str] = None) -> ShortConcept:
-        """Generates a structured video concept and prompt."""
-        chosen_category = category or random.choice(VIRAL_NICHES)
+        """
+        Instantly selects a unique concept from the 5,000+ database,
+        guaranteeing zero 503 API downtime and instant response.
+        """
+        chosen_category = (category or "").strip()
 
-        # Use fallback if client is not configured or in dry-run without key
-        if not self.client:
-            logger.info("Using curated fallback concept (No GEMINI_API_KEY or offline mode).")
-            matched = [c for c in FALLBACK_CONCEPTS if chosen_category.lower() in c.category.lower()]
-            return random.choice(matched) if matched else random.choice(FALLBACK_CONCEPTS)
+        # If user specified a category (e.g. "paladin", "samurai", "dragon")
+        if chosen_category and self.concepts:
+            query = chosen_category.lower()
+            # Filter concepts matching category, title, prompt, or tags
+            matched = [
+                c for c in self.concepts
+                if query in c.get("category", "").lower()
+                or query in c.get("concept_title", "").lower()
+                or query in c.get("video_prompt", "").lower()
+                or any(query in t.lower() for t in c.get("tags", []))
+            ]
+            if matched:
+                selected = random.choice(matched)
+                return ShortConcept(**selected)
 
-        prompt = f"""
-You are a viral YouTube Shorts director specializing in breathtaking CGI, fantasy, and cinematic AI visual storytelling.
-Brainstorm an unforgettable, high-retention video concept for the category: "{chosen_category}".
+        # If no specific category or no match in bank, pick randomly from the 5,000
+        if self.concepts:
+            selected = random.choice(self.concepts)
+            return ShortConcept(**selected)
 
-Requirements:
-1. Concept: Visually explosive, dynamic, and cinematic (e.g., dynamic flight, intense clash, colossal scale).
-2. Video Prompt: Explicitly designed for Google Veo video generation in vertical 9:16 aspect ratio. Describe lighting, camera motion, subject details, atmosphere, dynamic movement, and photorealistic textures. Avoid buzzwords like 'trending on artstation'; use direct cinematic cinematography terms.
-3. Voiceover Script: Exactly 15 to 25 words. A hypnotic, mysterious, or high-stakes hook designed for immediate viewer retention.
-4. YouTube Title: Must be under 65 characters, high CTR, and include #Shorts.
-5. YouTube Description: 2-3 engaging sentences + call to action.
-6. Tags: 5-8 relevant tags without hash symbols.
-
-Respond ONLY with valid JSON matching this schema:
-{{
-  "category": "{chosen_category}",
-  "concept_title": "string",
-  "video_prompt": "string",
-  "voiceover_script": "string",
-  "youtube_title": "string",
-  "youtube_description": "string",
-  "tags": ["string", "string"]
-}}
-"""
-        import time
-        from google.genai import types
-
-        # Robust multi-model chain to guarantee high availability during traffic spikes
-        candidate_models = [
-            config.GEMINI_TEXT_MODEL,  # gemini-3.6-flash
-            "gemini-3.7-flash",
-            "gemini-3.8-flash",
-            "gemini-3.5-flash",
-            "gemini-flash-latest",
-            "gemini-pro-latest"
-        ]
-
-        for model_name in candidate_models:
-            for attempt in range(1, 4):  # Retry up to 3 times per model
-                try:
-                    chat = self.client.chats.create(
-                        model=model_name,
-                        config=types.GenerateContentConfig(response_mime_type="application/json")
-                    )
-                    response = chat.send_message(prompt)
-                    raw_text = response.text.strip()
-                    data = json.loads(raw_text)
-                    return ShortConcept(**data)
-                except Exception as e:
-                    logger.warning(f"Gemini attempt {attempt}/3 with {model_name} failed: {e}")
-                    if attempt < 3:
-                        time.sleep(attempt * 2)
-
-        logger.error(f"All Gemini models failed. Generating dynamic fallback for '{chosen_category}'.")
-        matched = [c for c in FALLBACK_CONCEPTS if chosen_category.lower() in c.category.lower()]
-        if matched:
-            return random.choice(matched)
-
+        # Dynamic algorithmic fallback if bank is not present
+        cat_name = chosen_category or random.choice(VIRAL_NICHES)
         return ShortConcept(
-            category=chosen_category,
-            concept_title=f"The Legend of the {chosen_category.title()}",
+            category=cat_name,
+            concept_title=f"The Legend of the {cat_name.title()}",
             video_prompt=(
-                f"Cinematic vertical 9:16 framing. An epic {chosen_category} unleashing radiant celestial energy "
+                f"Cinematic vertical 9:16 framing. An epic {cat_name} unleashing radiant celestial energy "
                 "amidst swirling storm clouds, shattered stone, and glowing embers. Dynamic low-angle tracking camera, "
                 "hyper-detailed armor textures, volumetric god rays, photorealistic 8k render."
             ),
-            voiceover_script=f"When shadows consumed the realm, only the legendary {chosen_category} could turn the tide.",
-            youtube_title=f"The Legendary {chosen_category.title()} Has Awakened! ⚔️✨ #Shorts",
-            youtube_description=f"Witness the power of the {chosen_category}. Subscribe for daily epic visual encounters!",
-            tags=["Shorts", chosen_category.lower(), "Fantasy", "Cinematic", "AIArt", "Epic", "Veo"]
+            voiceover_script=f"When shadows consumed the realm, only the legendary {cat_name} could turn the tide.",
+            youtube_title=f"The Legendary {cat_name.title()} Has Awakened! #Shorts",
+            youtube_description=f"Witness the power of the {cat_name}. Subscribe for daily epic visual encounters!",
+            tags=["Shorts", cat_name.lower().replace(" ", ""), "Fantasy", "Cinematic", "AIArt", "Epic", "Veo"]
         )
