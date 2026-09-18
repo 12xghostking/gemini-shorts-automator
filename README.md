@@ -8,7 +8,7 @@ Generates **5–6 distinct AI scenes** per Short with dynamic camera panning, zo
 
 ## 🌟 Key Features
 
-- **5,000+ Concept Engine**: Pre-generated bank of 5,000+ unique, high-retention Short concepts across 250+ distinct archetypes. Zero downtime, zero 503 errors, and instant execution.
+- **10,000+ Concept Engine**: Pre-generated bank of 5,000+ unique, high-retention Short concepts across 250+ distinct archetypes. Zero downtime, zero 503 errors, and instant execution.
 - **Free Multi-Scene AI Video Synthesis**: Synthesizes 5–6 distinct visuals for every Short using distributed free AI generation clusters with automated retry fallbacks. Zero paid API keys or external credits.
 - **Cinematic Multi-Angle Camera Choreography**: Animates each distinct scene using dynamic push-in, pan-right, tilt-up, pull-out, and hero-drift camera motions with subtle atmospheric embers.
 - **Free Neural Voiceover**: High-fidelity narration generated through Microsoft Edge Neural TTS with zero subscription fees (or optional ElevenLabs).
@@ -72,8 +72,6 @@ cp .env.example .env
 Open `.env` and fill in your keys:
 
 ```env
-GEMINI_API_KEY=your_actual_gemini_api_key_here  # Optional: only if generating fresh concepts online
-GEMINI_TEXT_MODEL=gemini-2.5-flash
 YOUTUBE_PRIVACY_STATUS=unlisted
 DRY_RUN=false
 ```
@@ -160,7 +158,6 @@ Run as an autonomous cloud service on [Render.com](https://render.com). This giv
    | `DAILY_TARGET_SHORTS` | `24` |
    | `YOUTUBE_CLIENT_SECRET_JSON` | Open your local `client_secret.json`, copy the entire text, and paste it here |
    | `YOUTUBE_TOKEN_JSON` | Open your local `token.json`, copy the entire text, and paste it here |
-   | `GEMINI_API_KEY` | *(Optional)* Your Google Gemini API Key |
    | `AI_HORDE_API_KEY` | *(Optional)* Your AI Horde API Key |
 
 4. **Keep Render Free Tier Awake 24/7**:
