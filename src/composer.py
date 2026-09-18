@@ -121,23 +121,25 @@ class VideoComposer:
         vo_duration = get_media_duration(voiceover_path) if has_vo else 15.0
         final_duration = min(vo_duration + 0.5, float(config.MAX_DURATION_SECONDS))
 
+        ass_path = voiceover_path.with_suffix(".ass") if has_vo else None
         srt_path = voiceover_path.with_suffix(".srt") if has_vo else None
-        has_subs = getattr(config, "BURN_SUBTITLES", True) and srt_path and srt_path.exists() and srt_path.stat().st_size > 10
+
+        has_ass = getattr(config, "BURN_SUBTITLES", True) and ass_path and ass_path.exists() and ass_path.stat().st_size > 10
+        has_srt = getattr(config, "BURN_SUBTITLES", True) and srt_path and srt_path.exists() and srt_path.stat().st_size > 10
+        has_subs = has_ass or has_srt
 
         if ffmpeg_bin and has_vo:
             logger.info(f"[COMPOSER] Using direct FFmpeg stream muxer (Target Duration: {final_duration:.1f}s, Burnt-In Subtitles: {bool(has_subs)})...")
             try:
-                # Configure subtitle filter and video codec
-                if has_subs:
+                # Prefer styled ASS format for pixel-perfect font scaling and bottom placement
+                if has_ass:
+                    escaped_ass = str(ass_path.resolve()).replace("\\", "/").replace(":", "\\:")
+                    v_filter = f"[0:v]ass='{escaped_ass}'[vout]"
+                    v_map = "[vout]"
+                    v_codec_args = ["-c:v", "libx264", "-preset", "ultrafast", "-crf", "23"]
+                elif has_srt:
                     escaped_srt = str(srt_path.resolve()).replace("\\", "/").replace(":", "\\:")
-                    font_size = int(getattr(config, "SUBTITLE_FONT_SIZE", 22) * (self.height / 1280.0))
-                    margin_v = int(self.height * 0.12)  # ~150px on 1280h, ~230px on 1920h (above YouTube Shorts UI)
-                    sub_style = (
-                        f"FontName=Arial,FontSize={font_size},Bold=1,"
-                        f"PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BackColour=&H80000000,"
-                        f"Outline=3,Shadow=1,Alignment=2,MarginV={margin_v}"
-                    )
-                    v_filter = f"[0:v]subtitles='{escaped_srt}':force_style='{sub_style}'[vout]"
+                    v_filter = f"[0:v]subtitles='{escaped_srt}'[vout]"
                     v_map = "[vout]"
                     v_codec_args = ["-c:v", "libx264", "-preset", "ultrafast", "-crf", "23"]
                 else:

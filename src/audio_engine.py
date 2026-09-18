@@ -129,7 +129,41 @@ def generate_srt(punchy_cues) -> str:
     return "\n".join(lines)
 
 
-def generate_fallback_subtitles(text: str, duration: float, srt_path: Path, max_words: int = 4):
+def format_ass_time(td: timedelta) -> str:
+    """Formats timedelta into ASS timestamp format: H:MM:SS.cc"""
+    total_seconds = td.total_seconds()
+    hours = int(total_seconds // 3600)
+    minutes = int((total_seconds % 3600) // 60)
+    seconds = int(total_seconds % 60)
+    centis = int(td.microseconds / 10000)
+    return f"{hours}:{minutes:02d}:{seconds:02d}.{centis:02d}"
+
+
+def generate_ass(punchy_cues, width: int = 1080, height: int = 1920, font_size: int = 42, margin_v: int = 160) -> str:
+    """Renders cue dictionaries into styled Advanced SubStation Alpha (.ass) format with perfect screen scaling."""
+    header = f"""[Script Info]
+ScriptType: v4.00+
+PlayResX: {width}
+PlayResY: {height}
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,{font_size},&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,3,1,2,40,40,{margin_v},1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"""
+    events = []
+    for c in punchy_cues:
+        start_str = format_ass_time(c["start"])
+        end_str = format_ass_time(c["end"])
+        text = c["text"].replace("\n", "\\N")
+        events.append(f"Dialogue: 0,{start_str},{end_str},Default,,0,0,0,,{text}")
+    return header + "\n".join(events) + "\n"
+
+
+def generate_fallback_subtitles(text: str, duration: float, dest_path: Path, max_words: int = 4):
     """Generates evenly spaced subtitle cards across audio duration if direct word boundaries are unavailable."""
     words = text.strip().split()
     if not words or duration <= 0:
@@ -149,9 +183,24 @@ def generate_fallback_subtitles(text: str, duration: float, srt_path: Path, max_
             "end": end,
             "text": chunk
         })
+
+    # Save SRT
+    srt_path = dest_path.with_suffix(".srt")
     srt_content = generate_srt(cues)
     with open(str(srt_path), "w", encoding="utf-8") as f:
         f.write(srt_content)
+
+    # Save ASS
+    ass_path = dest_path.with_suffix(".ass")
+    ass_content = generate_ass(
+        cues,
+        width=getattr(config, "VIDEO_WIDTH", 1080),
+        height=getattr(config, "VIDEO_HEIGHT", 1920),
+        font_size=getattr(config, "SUBTITLE_FONT_SIZE", 42),
+        margin_v=getattr(config, "SUBTITLE_MARGIN_V", 160)
+    )
+    with open(str(ass_path), "w", encoding="utf-8") as f:
+        f.write(ass_content)
 
 
 class AudioEngine:
@@ -216,21 +265,35 @@ class AudioEngine:
                         elif chunk["type"] in ("WordBoundary", "SentenceBoundary"):
                             submaker.feed(chunk)
 
-                srt_path = dest_path.with_suffix(".srt")
                 if submaker.cues:
                     punchy = split_cues_into_punchy_chunks(
                         submaker.cues,
                         max_words_per_chunk=getattr(config, "SUBTITLE_WORDS_PER_CARD", 4)
                     )
+                    # Save SRT
+                    srt_path = dest_path.with_suffix(".srt")
                     srt_content = generate_srt(punchy)
                     with open(str(srt_path), "w", encoding="utf-8") as sf:
                         sf.write(srt_content)
-                    logger.info(f"[SUBTITLES] Generated {len(punchy)} punchy subtitle cues: {srt_path.name}")
+
+                    # Save styled ASS
+                    ass_path = dest_path.with_suffix(".ass")
+                    ass_content = generate_ass(
+                        punchy,
+                        width=getattr(config, "VIDEO_WIDTH", 1080),
+                        height=getattr(config, "VIDEO_HEIGHT", 1920),
+                        font_size=getattr(config, "SUBTITLE_FONT_SIZE", 42),
+                        margin_v=getattr(config, "SUBTITLE_MARGIN_V", 160)
+                    )
+                    with open(str(ass_path), "w", encoding="utf-8") as af:
+                        af.write(ass_content)
+
+                    logger.info(f"[SUBTITLES] Generated {len(punchy)} punchy subtitle cues: {ass_path.name}")
                 else:
                     generate_fallback_subtitles(
                         dramatic_text,
                         15.0,
-                        srt_path,
+                        dest_path,
                         max_words=getattr(config, "SUBTITLE_WORDS_PER_CARD", 4)
                     )
 
