@@ -78,12 +78,14 @@ def prompt(category):
 @click.option("--dry-run/--live", default=None, help="Run without burning Veo / YouTube API credits")
 @click.option("--upload/--no-upload", default=True, help="Whether to upload to YouTube")
 @click.option("--privacy", "-p", default=None, type=click.Choice(["public", "unlisted", "private"]), help="Upload privacy status (defaults to public)")
-def run_once(category, dry_run, upload, privacy):
+@click.option("--engine", "-e", default=None, type=click.Choice(["auto", "free", "veo"]), help="Video engine: 'free' (zero API credits) or 'veo' (Google Veo)")
+def run_once(category, dry_run, upload, privacy, engine):
     """Run full pipeline once (generate concept, video, voiceover, mix, and upload)."""
     from src.pipeline import ShortsPipeline
     pipeline = ShortsPipeline(dry_run=dry_run)
-    result = pipeline.run_single(category=category, upload=upload, privacy_status=privacy)
+    result = pipeline.run_single(category=category, upload=upload, privacy_status=privacy, engine=engine)
     console.print("[bold green]Pipeline execution completed successfully![/bold green]")
+
 
 
 @cli.command()

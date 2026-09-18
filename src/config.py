@@ -13,17 +13,21 @@ OUTPUT_DIR = PROJECT_ROOT / "output"
 RAW_VIDEO_DIR = OUTPUT_DIR / "raw"
 AUDIO_DIR = OUTPUT_DIR / "audio"
 FINAL_VIDEO_DIR = OUTPUT_DIR / "final"
+IMAGES_DIR = OUTPUT_DIR / "images"
 ASSETS_DIR = PROJECT_ROOT / "assets"
 MUSIC_DIR = ASSETS_DIR / "music"
 FONTS_DIR = ASSETS_DIR / "fonts"
 
-for path in [OUTPUT_DIR, RAW_VIDEO_DIR, AUDIO_DIR, FINAL_VIDEO_DIR, ASSETS_DIR, MUSIC_DIR, FONTS_DIR]:
+for path in [OUTPUT_DIR, RAW_VIDEO_DIR, AUDIO_DIR, FINAL_VIDEO_DIR, IMAGES_DIR, ASSETS_DIR, MUSIC_DIR, FONTS_DIR]:
     path.mkdir(parents=True, exist_ok=True)
 
-# API Keys & Models
+# API Keys & Video Engines
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 GEMINI_TEXT_MODEL = os.getenv("GEMINI_TEXT_MODEL", "gemini-3.6-flash")
 GEMINI_VIDEO_MODEL = os.getenv("GEMINI_VIDEO_MODEL", "veo-3.1-generate-preview")
+# VIDEO_ENGINE options: "auto" (veo if key present, else free), "free" (free image + 2.5D motion), "veo" (Google Veo)
+VIDEO_ENGINE = os.getenv("VIDEO_ENGINE", "auto").lower()
+
 
 # YouTube Settings
 YOUTUBE_CLIENT_SECRET_FILE = os.getenv("YOUTUBE_CLIENT_SECRET_FILE", "client_secret.json")

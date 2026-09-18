@@ -19,7 +19,10 @@ output/audio/*
 !output/audio/.gitkeep
 output/final/*
 !output/final/.gitkeep
+output/images/*
+!output/images/.gitkeep
 temp-audio.m4a
+
 
 # 3. Python Bytecode & Cache
 __pycache__/

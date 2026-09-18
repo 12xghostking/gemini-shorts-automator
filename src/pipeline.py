@@ -22,7 +22,13 @@ class ShortsPipeline:
         self.composer = VideoComposer()
         self.youtube_engine = YouTubeEngine()
 
-    def run_single(self, category: Optional[str] = None, upload: bool = True, privacy_status: Optional[str] = None) -> Dict[str, Any]:
+    def run_single(
+        self,
+        category: Optional[str] = None,
+        upload: bool = True,
+        privacy_status: Optional[str] = None,
+        engine: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Runs a complete cycle from concept to YouTube upload."""
         logger.info("=" * 60)
         logger.info(f"[START] SHORTS CREATION PIPELINE (Dry-Run: {self.dry_run})")
@@ -42,13 +48,15 @@ class ShortsPipeline:
         audio_path = self.audio_engine.generate_voiceover(concept.voiceover_script)
         music_path = self.audio_engine.get_background_music()
 
-        # Step 3: Video Generation (Google Veo)
+        # Step 3: Video Generation (Google Veo or Free AI 2.5D Motion)
         logger.info("\n[3/5] Generating vertical video clip...")
         raw_video_path = self.video_engine.generate_video(
             prompt=concept.video_prompt,
             dry_run=self.dry_run,
-            aspect_ratio="9:16"
+            aspect_ratio="9:16",
+            engine=engine
         )
+
 
         # Step 4: Video Composition & Audio Mixing
         logger.info("\n[4/5] Composing final 9:16 Short...")

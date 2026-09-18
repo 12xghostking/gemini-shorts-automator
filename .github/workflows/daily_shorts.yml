@@ -36,6 +36,15 @@ on:
           - public
           - unlisted
           - private
+      engine:
+        description: 'Video engine (auto, free=zero API credits, veo=Google Veo)'
+        required: false
+        default: 'auto'
+        type: choice
+        options:
+          - auto
+          - free
+          - veo
 
 jobs:
   generate-and-upload:
@@ -91,6 +100,9 @@ jobs:
             else
               ARGS="$ARGS --privacy \"public\""
             fi
+            if [ -n "${{ inputs.engine }}" ]; then
+              ARGS="$ARGS --engine \"${{ inputs.engine }}\""
+            fi
           else
             # Scheduled run defaults to live generation and public upload
             ARGS="--live --privacy \"public\""
@@ -107,4 +119,6 @@ jobs:
           path: |
             output/final/*.mp4
             output/audio/*.mp3
+            output/images/*.jpg
           retention-days: 7
+
