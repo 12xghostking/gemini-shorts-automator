@@ -88,12 +88,14 @@ def run_once(category, dry_run, upload):
 @click.option("--file", "-f", default=None, help="Path to video file to upload (defaults to latest final Short)")
 @click.option("--title", "-t", default="Cyber Samurai Showdown in Neon Rain ⚔️ #Shorts #Cyberpunk", help="Video title")
 @click.option("--description", "-d", default="A lethal cyber samurai duel in neo-Tokyo under pouring neon rain. Created with Google Veo and Gemini. #Shorts #Cyberpunk #Veo", help="Description")
-@click.option("--privacy", "-p", default="unlisted", type=click.Choice(["public", "unlisted", "private"]), help="Upload privacy status")
+@click.option("--privacy", "-p", default=None, type=click.Choice(["public", "unlisted", "private"]), help="Upload privacy status (defaults to .env setting)")
 def upload(file, title, description, privacy):
     """Upload a specific video file directly to YouTube using YouTube Data API v3."""
     from src.youtube_engine import YouTubeEngine
     from src import config
     from pathlib import Path
+
+    privacy = privacy or config.YOUTUBE_PRIVACY_STATUS
 
     if not file:
         candidates = sorted(config.FINAL_VIDEO_DIR.glob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True)
