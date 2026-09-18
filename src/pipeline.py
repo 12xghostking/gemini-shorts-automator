@@ -59,7 +59,7 @@ class ShortsPipeline:
         except Exception:
             pass
 
-        # Step 3: Video Generation (Google Veo or Free AI 5-Shot Storytelling Montage)
+        # Step 3: Video Generation (Multi-Scene Free AI Storytelling Video Generation)
         logger.info(f"\n[3/5] Generating vertical video clip (Target duration: {target_video_duration}s)...")
         raw_video_path = self.video_engine.generate_video(
             prompt=concept.video_prompt,

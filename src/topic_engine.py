@@ -41,7 +41,7 @@ VIRAL_NICHES = [
 class ShortConcept(BaseModel):
     category: str
     concept_title: str
-    video_prompt: str = Field(description="Detailed visual prompt for Veo in 9:16 vertical format")
+    video_prompt: str = Field(description="Detailed visual prompt for AI video/image generator in 9:16 vertical format")
     voiceover_script: str = Field(description="10-25 word gripping narrative hook")
     youtube_title: str = Field(description="Catchy Short title including #Shorts")
     youtube_description: str
@@ -106,5 +106,5 @@ class TopicEngine:
             voiceover_script=f"When shadows consumed the realm, only the legendary {cat_name} could turn the tide.",
             youtube_title=f"The Legendary {cat_name.title()} Has Awakened! #Shorts",
             youtube_description=f"Witness the power of the {cat_name}. Subscribe for daily epic visual encounters!",
-            tags=["Shorts", cat_name.lower().replace(" ", ""), "Fantasy", "Cinematic", "AIArt", "Epic", "Veo"]
+            tags=["Shorts", cat_name.lower().replace(" ", ""), "Fantasy", "Cinematic", "AIArt", "Epic", "Storytelling"]
         )

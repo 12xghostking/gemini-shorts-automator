@@ -39,8 +39,8 @@ def check_env():
     table.add_column("Value / Status", style="green")
 
     table.add_row("GEMINI_API_KEY", "[OK] Configured" if config.GEMINI_API_KEY else "[MISSING] (Set in .env)")
-    table.add_row("GEMINI_TEXT_MODEL", config.GEMINI_TEXT_MODEL)
-    table.add_row("GEMINI_VIDEO_MODEL", config.GEMINI_VIDEO_MODEL)
+    table.add_row("Video Engine", "Free 5-Shot Storytelling Montage (0 API Credits)")
+    table.add_row("Scenes Per Short", str(config.NUM_SCENES))
     
     secret_exists = (config.PROJECT_ROOT / config.YOUTUBE_CLIENT_SECRET_FILE).exists()
     table.add_row("YouTube client_secret.json", "[OK] Found" if secret_exists else "[WARNING] Not Found (Required for live upload)")
@@ -58,7 +58,7 @@ def check_env():
 @cli.command()
 @click.option("--category", "-c", default=None, help="Specific niche (e.g. 'dragons', 'samurai')")
 def prompt(category):
-    """Generate a viral topic, Veo video prompt, and hook script preview."""
+    """Generate a viral topic, visual prompt, and hook script preview."""
     from src.topic_engine import TopicEngine
     engine = TopicEngine()
     concept = engine.generate_concept(category)
@@ -68,19 +68,19 @@ def prompt(category):
         f"[bold cyan]Title:[/bold cyan] {concept.concept_title}\n\n"
         f"[bold yellow]YouTube Title:[/bold yellow] {concept.youtube_title}\n\n"
         f"[bold green]Voiceover Script:[/bold green] \"{concept.voiceover_script}\"\n\n"
-        f"[bold magenta]Veo Video Prompt:[/bold magenta]\n{concept.video_prompt}\n\n"
+        f"[bold magenta]Visual Story Prompt:[/bold magenta]\n{concept.video_prompt}\n\n"
         f"[bold blue]Tags:[/bold blue] {', '.join(concept.tags)}",
         title="Generated Short Concept"
     ))
 
 @cli.command()
 @click.option("--category", "-c", default=None, help="Theme category")
-@click.option("--dry-run/--live", default=None, help="Run without burning Veo / YouTube API credits")
+@click.option("--dry-run/--live", default=None, help="Run without uploading to YouTube")
 @click.option("--upload/--no-upload", default=True, help="Whether to upload to YouTube")
 @click.option("--privacy", "-p", default=None, type=click.Choice(["public", "unlisted", "private"]), help="Upload privacy status (defaults to public)")
-@click.option("--engine", "-e", default=None, type=click.Choice(["auto", "free", "veo"]), help="Video engine: 'free' (zero API credits) or 'veo' (Google Veo)")
+@click.option("--engine", "-e", default="free", help="Video engine (defaults to free)")
 def run_once(category, dry_run, upload, privacy, engine):
-    """Run full pipeline once (generate concept, video, voiceover, mix, and upload)."""
+    """Run full pipeline once (generate concept, 5-6 distinct images, voiceover, mix, and upload)."""
     from src.pipeline import ShortsPipeline
     pipeline = ShortsPipeline(dry_run=dry_run)
     result = pipeline.run_single(category=category, upload=upload, privacy_status=privacy, engine=engine)
@@ -88,10 +88,11 @@ def run_once(category, dry_run, upload, privacy, engine):
 
 
 
+
 @cli.command()
 @click.option("--file", "-f", default=None, help="Path to video file to upload (defaults to latest final Short)")
 @click.option("--title", "-t", default="Cyber Samurai Showdown in Neon Rain ⚔️ #Shorts #Cyberpunk", help="Video title")
-@click.option("--description", "-d", default="A lethal cyber samurai duel in neo-Tokyo under pouring neon rain. Created with Google Veo and Gemini. #Shorts #Cyberpunk #Veo", help="Description")
+@click.option("--description", "-d", default="A lethal cyber samurai duel in neo-Tokyo under pouring neon rain. Created with Free AI Storytelling Generator. #Shorts #Cyberpunk #AIArt", help="Description")
 @click.option("--privacy", "-p", default=None, type=click.Choice(["public", "unlisted", "private"]), help="Upload privacy status (defaults to .env setting)")
 def upload(file, title, description, privacy):
     """Upload a specific video file directly to YouTube using YouTube Data API v3."""
@@ -120,7 +121,7 @@ def upload(file, title, description, privacy):
         video_path=target_file,
         title=title,
         description=description,
-        tags=["Shorts", "Cyberpunk", "Samurai", "Veo", "AIArt", "Cinematic"],
+        tags=["Shorts", "Cyberpunk", "Samurai", "AIArt", "Cinematic", "Storytelling"],
         privacy_status=privacy,
         dry_run=False
     )

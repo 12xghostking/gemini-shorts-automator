@@ -21,12 +21,15 @@ FONTS_DIR = ASSETS_DIR / "fonts"
 for path in [OUTPUT_DIR, RAW_VIDEO_DIR, AUDIO_DIR, FINAL_VIDEO_DIR, IMAGES_DIR, ASSETS_DIR, MUSIC_DIR, FONTS_DIR]:
     path.mkdir(parents=True, exist_ok=True)
 
-# API Keys & Video Engines
+# Optional Concept Generation Settings
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
-GEMINI_TEXT_MODEL = os.getenv("GEMINI_TEXT_MODEL", "gemini-3.6-flash")
-GEMINI_VIDEO_MODEL = os.getenv("GEMINI_VIDEO_MODEL", "veo-3.1-generate-preview")
-# VIDEO_ENGINE options: "auto" (veo if key present, else free), "free" (free image + 2.5D motion), "veo" (Google Veo)
-VIDEO_ENGINE = os.getenv("VIDEO_ENGINE", "auto").lower()
+GEMINI_TEXT_MODEL = os.getenv("GEMINI_TEXT_MODEL", "gemini-2.5-flash")
+
+# Free Video Engine Settings
+# Generates 5-6 distinct AI visuals per Short with 2.5D cinematic camera panning
+VIDEO_ENGINE = "free"
+NUM_SCENES = int(os.getenv("NUM_SCENES", "5"))
+
 
 
 # YouTube Settings

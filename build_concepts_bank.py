@@ -380,7 +380,7 @@ def generate_5000_concepts(output_file: Path, concepts_per_archetype: int = 20):
                 f"Witness the power of the {name} as ancient legends come alive. "
                 f"Created with cinematic AI visual storytelling. Subscribe for daily epic encounters! #Shorts #{clean_name}"
             )
-            tags = ["Shorts", clean_name, "Cinematic", "Epic", "AIArt", "Veo", "Animation"]
+            tags = ["Shorts", clean_name, "Cinematic", "Epic", "AIArt", "Storytelling", "Animation"]
 
             concepts.append({
                 "category": cat,

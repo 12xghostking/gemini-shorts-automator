@@ -1,4 +1,4 @@
-# Core Google GenAI SDK (Gemini & Veo video generation)
+# Core Google GenAI SDK (Optional Gemini concept generation)
 google-genai>=1.0.0
 
 # YouTube Data API v3 & OAuth Authentication

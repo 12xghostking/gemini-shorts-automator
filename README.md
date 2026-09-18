@@ -1,17 +1,20 @@
-# 🎬 Gemini Faceless YouTube Shorts Automator
+# 🎬 Autonomous Faceless YouTube Shorts Automator
 
-An autonomous AI pipeline that uses **Google Gemini & Veo** to generate, compose, and publish viral vertical 9:16 Shorts (e.g. flying dragons, samurai duels, surreal fantasy, sci-fi titans) directly to YouTube 2–3 times a day.
+An autonomous AI pipeline that generates, composes, and publishes viral vertical 9:16 Shorts (e.g. samurai duels, cyberpunk warriors, celestial titans, dark fantasy legends) directly to YouTube 2–3 times a day.
+
+Generates **5–6 distinct AI scenes** per Short with dynamic camera panning, zoom choreography, atmospheric particle effects, and high-fidelity neural voiceover — **100% free with zero API costs**.
 
 ---
 
 ## 🌟 Key Features
 
-- **Dynamic Concept & Script Engine**: Uses Gemini 2.5/1.5 Flash to rotate viral niches, generate hook scripts, and craft optimized Veo video prompts.
-- **Google Veo Video Generation**: Direct 9:16 vertical video synthesis via `google-genai` SDK.
+- **5,000+ Concept Engine**: Pre-generated bank of 5,000+ unique, high-retention Short concepts across 250+ distinct archetypes. Zero downtime, zero 503 errors, and instant execution.
+- **Free Multi-Scene AI Video Synthesis**: Synthesizes 5–6 distinct visuals for every Short using distributed free AI generation clusters with automated retry fallbacks. Zero paid API keys or external credits.
+- **Cinematic Multi-Angle Camera Choreography**: Animates each distinct scene using dynamic push-in, pan-right, tilt-up, pull-out, and hero-drift camera motions with subtle atmospheric embers.
 - **Free Neural Voiceover**: High-fidelity narration generated through Microsoft Edge Neural TTS with zero subscription fees (or optional ElevenLabs).
 - **Automated Video Composer**: Scales, loops, and mixes clips with ducked background music into YouTube Shorts-compliant 1080x1920 MP4s using MoviePy and FFmpeg.
 - **Autonomous YouTube Uploading**: Automatically publishes or schedules Shorts with optimized titles, `#Shorts` tags, and descriptions using YouTube Data API v3.
-- **Zero-Cost Dry-Run Mode**: Test the entire pipeline locally without spending API credits or YouTube quota.
+- **Zero-Cost Dry-Run Mode**: Test the entire pipeline locally without spending any quota.
 
 ---
 
@@ -24,17 +27,20 @@ gemini-shorts-automator/
 ├── client_secret.json          # Your YouTube OAuth credentials from Google Cloud
 ├── requirements.txt            # Python dependencies
 ├── cli.py                      # Main Command Line Interface
+├── build_concepts_bank.py      # Generator for 5,000+ concept bank
 ├── assets/
+│   ├── concepts_bank.json      # 5,000+ offline concepts database
 │   ├── music/                  # Add royalty-free .mp3 / .wav tracks here
 │   └── fonts/                  # Custom fonts for overlays
 ├── output/
-│   ├── raw/                    # Raw Veo video clips
+│   ├── images/                 # Downloaded distinct AI scene images
+│   ├── raw/                    # Raw multi-scene video clips
 │   ├── audio/                  # Synthesized voiceovers
 │   └── final/                  # Ready-to-upload 1080x1920 MP4 Shorts
 └── src/
     ├── config.py               # Path & environment settings
-    ├── topic_engine.py         # Gemini prompt & script generator
-    ├── video_engine.py         # Google Veo video generation & mock mode
+    ├── topic_engine.py         # 5,000+ concept selector & script generator
+    ├── video_engine.py         # Free 5-scene AI visual & camera engine
     ├── audio_engine.py         # Voiceover synthesis & audio loader
     ├── composer.py             # 9:16 video assembly & audio ducking
     ├── youtube_engine.py       # YouTube OAuth & upload client
@@ -66,9 +72,8 @@ cp .env.example .env
 Open `.env` and fill in your keys:
 
 ```env
-GEMINI_API_KEY=your_actual_gemini_api_key_here
+GEMINI_API_KEY=your_actual_gemini_api_key_here  # Optional: only if generating fresh concepts online
 GEMINI_TEXT_MODEL=gemini-2.5-flash
-GEMINI_VIDEO_MODEL=veo-2.0-generate-001
 YOUTUBE_PRIVACY_STATUS=unlisted
 DRY_RUN=false
 ```
@@ -77,12 +82,7 @@ DRY_RUN=false
 
 ## 🔑 How to Get Your Credentials
 
-### 1. Google Gemini API Key
-1. Visit [Google AI Studio](https://aistudio.google.com/).
-2. Click **Get API key** and create a key in your project.
-3. Paste the key into `GEMINI_API_KEY` in `.env`.
-
-### 2. YouTube Data API v3 (`client_secret.json`)
+### 1. YouTube Data API v3 (`client_secret.json`)
 1. Go to [Google Cloud Console](https://console.cloud.google.com/).
 2. Create a new project (e.g. `YT-Shorts-Automator`).
 3. Enable the **YouTube Data API v3** in **APIs & Services > Library**.
@@ -106,7 +106,7 @@ python cli.py check-env
 ```
 
 ### 2. Test Concept & Prompt Generation
-Preview the dynamic viral topics, Veo prompts, and voiceover scripts:
+Preview the dynamic viral topics, visual prompts, and voiceover scripts:
 ```bash
 python cli.py prompt
 # Or specify a category:
@@ -114,7 +114,7 @@ python cli.py prompt --category "samurai"
 ```
 
 ### 3. Run a Dry-Run Test (Zero Cost)
-Generate and assemble a test Short without consuming Gemini Veo credits:
+Generate 5 distinct AI scenes and assemble a full test Short:
 ```bash
 python cli.py run-once --dry-run
 ```
