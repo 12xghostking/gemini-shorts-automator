@@ -11,18 +11,32 @@ from src import config
 
 logger = logging.getLogger(__name__)
 
-# Default rotating categories for dynamic variety
+# Expanded rotating categories across 250+ archetypes
 VIRAL_NICHES = [
-    "Mythical Dragons & Flying Titans",
-    "Cyberpunk & Feudal Warriors",
     "Holy Warriors & Crusaders",
-    "Deep Sea Bioluminescent Leviathans",
-    "Futuristic Mecha & Sci-Fi Warfare",
-    "Ancient Titans & Primordials",
-    "Cosmic Entities & Nebula Gods",
+    "Celestial Entities & Angels",
+    "Norse Sky Warriors",
+    "Ancient Legions & Warriors",
+    "Sky Realms & Mythic Beasts",
+    "Cyberpunk & Feudal Warriors",
     "Shadow Assassins & Rogues",
+    "Feudal Legends & Ronin",
+    "Martial Arts & Monks",
     "Norse Mythology & Raiders",
+    "Mythical Dragons & Flying Titans",
+    "Celestial Beasts & Avian Titans",
+    "Deep Sea Bioluminescent Leviathans",
+    "Glacial Legends & Ice Titans",
+    "Ancient Titans & Primordials",
+    "Eldritch Terrors & Abyssal Horrors",
+    "Dark Magic & Undead Hordes",
+    "Futuristic Mecha & Sci-Fi Warfare",
+    "Time Travel & Paradoxes",
+    "Neo-Tokyo & Cyberpunk",
+    "Cosmic Entities & Nebula Gods",
+    "Dark Fantasy & Vampires",
 ]
+
 
 class ShortConcept(BaseModel):
     category: str
