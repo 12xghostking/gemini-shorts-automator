@@ -48,14 +48,27 @@ class ShortsPipeline:
         audio_path = self.audio_engine.generate_voiceover(concept.voiceover_script)
         music_path = self.audio_engine.get_background_music()
 
-        # Step 3: Video Generation (Google Veo or Free AI 2.5D Motion)
-        logger.info("\n[3/5] Generating vertical video clip...")
+        # Calculate exact duration matching voiceover for seamless pacing
+        target_video_duration = 10.0
+        try:
+            from moviepy import AudioFileClip
+            if audio_path.exists():
+                vo_audio = AudioFileClip(str(audio_path))
+                target_video_duration = max(6.0, min(vo_audio.duration + 1.0, float(config.MAX_DURATION_SECONDS)))
+                vo_audio.close()
+        except Exception:
+            pass
+
+        # Step 3: Video Generation (Google Veo or Free AI 5-Shot Storytelling Montage)
+        logger.info(f"\n[3/5] Generating vertical video clip (Target duration: {target_video_duration}s)...")
         raw_video_path = self.video_engine.generate_video(
             prompt=concept.video_prompt,
             dry_run=self.dry_run,
             aspect_ratio="9:16",
-            engine=engine
+            engine=engine,
+            duration=target_video_duration
         )
+
 
 
         # Step 4: Video Composition & Audio Mixing

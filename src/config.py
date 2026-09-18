@@ -45,6 +45,8 @@ VIDEO_WIDTH = int(os.getenv("VIDEO_WIDTH", "1080"))
 VIDEO_HEIGHT = int(os.getenv("VIDEO_HEIGHT", "1920"))
 VIDEO_FPS = int(os.getenv("VIDEO_FPS", "30"))
 MAX_DURATION_SECONDS = int(os.getenv("MAX_DURATION_SECONDS", "15"))
+NUM_SCENES = int(os.getenv("NUM_SCENES", "5"))
+
 
 # Pipeline Behavior
 DRY_RUN = os.getenv("DRY_RUN", "false").lower() in ("true", "1", "yes")
