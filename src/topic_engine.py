@@ -119,9 +119,18 @@ Respond ONLY with valid JSON matching this schema:
         import time
         from google.genai import types
 
-        candidate_models = [config.GEMINI_TEXT_MODEL, "gemini-flash-latest"]
+        # Robust multi-model chain to guarantee high availability during traffic spikes
+        candidate_models = [
+            config.GEMINI_TEXT_MODEL,  # gemini-3.6-flash
+            "gemini-3.7-flash",
+            "gemini-3.8-flash",
+            "gemini-3.5-flash",
+            "gemini-flash-latest",
+            "gemini-pro-latest"
+        ]
+
         for model_name in candidate_models:
-            for attempt in range(2):
+            for attempt in range(1, 4):  # Retry up to 3 times per model
                 try:
                     chat = self.client.chats.create(
                         model=model_name,
@@ -132,8 +141,25 @@ Respond ONLY with valid JSON matching this schema:
                     data = json.loads(raw_text)
                     return ShortConcept(**data)
                 except Exception as e:
-                    logger.warning(f"Gemini attempt {attempt + 1} with {model_name} failed: {e}")
-                    time.sleep(2)
+                    logger.warning(f"Gemini attempt {attempt}/3 with {model_name} failed: {e}")
+                    if attempt < 3:
+                        time.sleep(attempt * 2)
 
-        logger.error("All Gemini API attempts failed. Falling back to curated template.")
-        return random.choice(FALLBACK_CONCEPTS)
+        logger.error(f"All Gemini models failed. Generating dynamic fallback for '{chosen_category}'.")
+        matched = [c for c in FALLBACK_CONCEPTS if chosen_category.lower() in c.category.lower()]
+        if matched:
+            return random.choice(matched)
+
+        return ShortConcept(
+            category=chosen_category,
+            concept_title=f"The Legend of the {chosen_category.title()}",
+            video_prompt=(
+                f"Cinematic vertical 9:16 framing. An epic {chosen_category} unleashing radiant celestial energy "
+                "amidst swirling storm clouds, shattered stone, and glowing embers. Dynamic low-angle tracking camera, "
+                "hyper-detailed armor textures, volumetric god rays, photorealistic 8k render."
+            ),
+            voiceover_script=f"When shadows consumed the realm, only the legendary {chosen_category} could turn the tide.",
+            youtube_title=f"The Legendary {chosen_category.title()} Has Awakened! ⚔️✨ #Shorts",
+            youtube_description=f"Witness the power of the {chosen_category}. Subscribe for daily epic visual encounters!",
+            tags=["Shorts", chosen_category.lower(), "Fantasy", "Cinematic", "AIArt", "Epic", "Veo"]
+        )
