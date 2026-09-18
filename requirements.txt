@@ -21,3 +21,7 @@ click>=8.1.0
 rich>=13.7.0
 schedule>=1.2.0
 requests>=2.31.0
+
+# Web Server for Render & Cloud Deployment
+fastapi>=0.110.0
+uvicorn>=0.28.0

@@ -129,11 +129,23 @@ def upload(file, title, description, privacy):
 
 @cli.command()
 def schedule():
-    """Start continuous 2-3x daily background scheduler."""
+    """Start continuous 24/7 background scheduler (CLI mode)."""
     from src.pipeline import ShortsPipeline
     pipeline = ShortsPipeline()
     console.print("[bold cyan]Starting YouTube Shorts Daily Scheduler...[/bold cyan]")
     pipeline.start_scheduler()
 
+@cli.command()
+@click.option("--host", default="0.0.0.0", help="Host to bind server")
+@click.option("--port", default=8080, type=int, help="Port to run server on")
+def serve(host, port):
+    """Start the 24/7 Web Server & API dashboard (Render / Local production server)."""
+    import uvicorn
+    from server import app
+    console.print(f"[bold green]Starting Web Server on http://{host}:{port}[/bold green]")
+    console.print("[bold cyan]Includes 24/7 hourly background scheduler, /health, /status, and live dashboard.[/bold cyan]")
+    uvicorn.run(app, host=host, port=port)
+
 if __name__ == "__main__":
     cli()
+

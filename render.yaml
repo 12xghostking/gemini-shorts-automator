@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: gemini-shorts-automator
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: ENABLE_SCHEDULER
+        value: "true"
+      - key: YOUTUBE_PRIVACY_STATUS
+        value: public
+      - key: DAILY_TARGET_SHORTS
+        value: "24"
+      - key: DRY_RUN
+        value: "false"
+      - key: YOUTUBE_CLIENT_SECRET_JSON
+        sync: false
+      - key: YOUTUBE_TOKEN_JSON
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: AI_HORDE_API_KEY
+        sync: false

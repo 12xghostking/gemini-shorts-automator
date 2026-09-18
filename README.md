@@ -131,7 +131,62 @@ python cli.py run-once --live
 
 ## ⏰ Automating 24 Daily Uploads (1 Video Per Hour)
 
-### Option A: GitHub Actions (Recommended — 100% Cloud, No PC Needed!)
+### Option A: Deploy to Render (24/7 Cloud Web Service & Dashboard)
+
+Run as an autonomous cloud service on [Render.com](https://render.com). This gives you:
+- **Continuous 24/7 autonomous uploads** (1 video every hour = 24 uploads daily)
+- **Live Dark-Mode Web Dashboard**: Trigger on-demand generation, monitor queue, inspect upload stats, and stream previews directly from your browser.
+- **Health check & REST API**: Endpoints at `/health`, `/status`, `/trigger`, and `/videos`.
+
+#### Step-by-Step Render Deployment:
+
+1. **Push your repository to GitHub**:
+   Ensure all changes including `Dockerfile`, `render.yaml`, and `server.py` are committed and pushed.
+
+2. **Create a New Web Service on Render**:
+   - Log into [dashboard.render.com](https://dashboard.render.com/).
+   - Click **New +** > **Web Service**.
+   - Connect your GitHub repository (`gemini-shorts-automator`).
+   - Choose **Docker** as the runtime (Render will automatically detect the included `Dockerfile` with system `ffmpeg`).
+   - Choose your plan (Free or Starter).
+
+3. **Add Environment Variables in Render Dashboard**:
+   Under the **Environment** tab in your Render service, add:
+   | Key | Value / Instructions |
+   |---|---|
+   | `PORT` | `8080` (or leave default `$PORT`) |
+   | `ENABLE_SCHEDULER` | `true` (Runs automated upload every hour) |
+   | `YOUTUBE_PRIVACY_STATUS` | `public` (or `unlisted`) |
+   | `DAILY_TARGET_SHORTS` | `24` |
+   | `YOUTUBE_CLIENT_SECRET_JSON` | Open your local `client_secret.json`, copy the entire text, and paste it here |
+   | `YOUTUBE_TOKEN_JSON` | Open your local `token.json`, copy the entire text, and paste it here |
+   | `GEMINI_API_KEY` | *(Optional)* Your Google Gemini API Key |
+   | `AI_HORDE_API_KEY` | *(Optional)* Your AI Horde API Key |
+
+4. **Keep Render Free Tier Awake 24/7**:
+   Render's free tier spins down after 15 minutes of inactivity. To keep your hourly scheduler running 24/7 for free:
+   - Create a free account at [UptimeRobot.com](https://uptimerobot.com).
+   - Add a new HTTP Monitor targeting: `https://your-service-name.onrender.com/health`
+   - Set the monitoring interval to **every 10 minutes**.
+   - *Alternative*: Upgrade to Render's **Starter** instance ($7/month) which stays running continuously without sleeping.
+
+5. **Access Your Live Dashboard**:
+   Open `https://your-service-name.onrender.com` in your browser to view your control panel!
+
+---
+
+### Option B: Run Local Web Server
+
+You can also run the web server and dashboard locally on your machine:
+
+```bash
+python cli.py serve --port 8080
+```
+Then navigate to `http://localhost:8080` in your web browser.
+
+---
+
+### Option C: GitHub Actions (Cloud Cron Alternative)
 A pre-configured GitHub Actions workflow is included at `.github/workflows/daily_shorts.yml`. It runs automatically in the cloud **every hour (`0 * * * *`)** to create, compose, and upload 24 Shorts a day!
 
 #### Setting Up GitHub Secrets:
@@ -145,11 +200,11 @@ A pre-configured GitHub Actions workflow is included at `.github/workflows/daily
 4. **Test in GitHub**:
    - Go to the **Actions** tab in your repository.
    - Select **Hourly YouTube Shorts Generator & Uploader (24x Daily)**.
-   - Click **Run workflow** (you can toggle dry-run or pick a custom category like `dragons` or `samurai`).
+   - Click **Run workflow**.
 
 ---
 
-### Option B: Built-in Python Scheduler (Local Machine)
+### Option D: Built-in Python Scheduler (Local Machine)
 Run the continuous background runner that uploads 1 video every hour:
 ```bash
 python cli.py schedule
@@ -157,7 +212,7 @@ python cli.py schedule
 
 ---
 
-### Option C: Windows Task Scheduler (For Always-On PC)
+### Option E: Windows Task Scheduler (For Always-On PC)
 1. Open Windows **Task Scheduler** (`taskschd.msc`).
 2. Click **Create Basic Task** -> Name: `YT-Shorts-Hourly`.
 3. Trigger: **Daily**, repeat task every **1 hour** for a duration of **indefinitely**.
@@ -165,3 +220,4 @@ python cli.py schedule
    - Program: `python.exe`
    - Arguments: `cli.py run-once --live`
    - Start in: `c:\Users\sirki\projects\gemini-shorts-automator`
+
