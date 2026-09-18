@@ -1,223 +1,132 @@
-# 🎬 Autonomous Faceless YouTube Shorts Automator
+"""Topic and Prompt Engine using a 10,000+ concept bank.
 
-An autonomous AI pipeline that generates, composes, and publishes viral vertical 9:16 Shorts (e.g. samurai duels, cyberpunk warriors, celestial titans, dark fantasy legends) directly to YouTube 2–3 times a day.
+The generator now deliberately expands the bank to create a broader, more
+unpredictable mix of archetypes, environments, and narration so the Shorts
+automator can keep producing fresh content for long-running cycles.
+"""
 
-Generates **5–6 distinct AI scenes** per Short with dynamic camera panning, zoom choreography, atmospheric particle effects, and high-fidelity neural voiceover — **100% free with zero API costs**.
+import json
+import random
+import logging
+from pathlib import Path
+from typing import Optional, List
+from pydantic import BaseModel, Field
 
----
+from src import config
 
-## 🌟 Key Features
+logger = logging.getLogger(__name__)
 
-- **5,000+ Concept Engine**: Pre-generated bank of 5,000+ unique, high-retention Short concepts across 250+ distinct archetypes. Zero downtime, zero 503 errors, and instant execution.
-- **Free Multi-Scene AI Video Synthesis**: Synthesizes 5–6 distinct visuals for every Short using distributed free AI generation clusters with automated retry fallbacks. Zero paid API keys or external credits.
-- **Cinematic Multi-Angle Camera Choreography**: Animates each distinct scene using dynamic push-in, pan-right, tilt-up, pull-out, and hero-drift camera motions with subtle atmospheric embers.
-- **Free Neural Voiceover**: High-fidelity narration generated through Microsoft Edge Neural TTS with zero subscription fees (or optional ElevenLabs).
-- **Automated Video Composer**: Scales, loops, and mixes clips with ducked background music into YouTube Shorts-compliant 1080x1920 MP4s using MoviePy and FFmpeg.
-- **Autonomous YouTube Uploading**: Automatically publishes or schedules Shorts with optimized titles, `#Shorts` tags, and descriptions using YouTube Data API v3.
-- **Zero-Cost Dry-Run Mode**: Test the entire pipeline locally without spending any quota.
+# Expanded rotating categories across 250+ archetypes
+VIRAL_NICHES = [
+    "Holy Warriors & Crusaders",
+    "Celestial Entities & Angels",
+    "Norse Sky Warriors",
+    "Ancient Legions & Warriors",
+    "Sky Realms & Mythic Beasts",
+    "Cyberpunk & Feudal Warriors",
+    "Shadow Assassins & Rogues",
+    "Feudal Legends & Ronin",
+    "Martial Arts & Monks",
+    "Norse Mythology & Raiders",
+    "Mythical Dragons & Flying Titans",
+    "Celestial Beasts & Avian Titans",
+    "Deep Sea Bioluminescent Leviathans",
+    "Glacial Legends & Ice Titans",
+    "Ancient Titans & Primordials",
+    "Eldritch Terrors & Abyssal Horrors",
+    "Dark Magic & Undead Hordes",
+    "Futuristic Mecha & Sci-Fi Warfare",
+    "Time Travel & Paradoxes",
+    "Neo-Tokyo & Cyberpunk",
+    "Cosmic Entities & Nebula Gods",
+    "Dark Fantasy & Vampires",
+]
 
----
 
-## 📂 Project Structure
+class ShortConcept(BaseModel):
+    category: str
+    concept_title: str
+    video_prompt: str = Field(description="Detailed visual prompt for AI video/image generator in 9:16 vertical format")
+    voiceover_script: str = Field(description="10-25 word gripping narrative hook")
+    youtube_title: str = Field(description="Catchy Short title including #Shorts")
+    youtube_description: str
+    tags: List[str]
 
-```
-gemini-shorts-automator/
-├── .env.example                # Template for environment variables and API keys
-├── .env                        # Local credentials (gitignored)
-├── client_secret.json          # Your YouTube OAuth credentials from Google Cloud
-├── requirements.txt            # Python dependencies
-├── cli.py                      # Main Command Line Interface
-├── build_concepts_bank.py      # Generator for 5,000+ concept bank
-├── assets/
-│   ├── concepts_bank.json      # 5,000+ offline concepts database
-│   ├── music/                  # Add royalty-free .mp3 / .wav tracks here
-│   └── fonts/                  # Custom fonts for overlays
-├── output/
-│   ├── images/                 # Downloaded distinct AI scene images
-│   ├── raw/                    # Raw multi-scene video clips
-│   ├── audio/                  # Synthesized voiceovers
-│   └── final/                  # Ready-to-upload 1080x1920 MP4 Shorts
-└── src/
-    ├── config.py               # Path & environment settings
-    ├── topic_engine.py         # 5,000+ concept selector & script generator
-    ├── video_engine.py         # Free 5-scene AI visual & camera engine
-    ├── audio_engine.py         # Voiceover synthesis & audio loader
-    ├── composer.py             # 9:16 video assembly & audio ducking
-    ├── youtube_engine.py       # YouTube OAuth & upload client
-    └── pipeline.py             # Full end-to-end orchestration & scheduler
-```
 
----
+class TopicEngine:
+    def __init__(self, api_key: Optional[str] = None):
+        self.concepts_bank_path = config.ASSETS_DIR / "concepts_bank.json"
+        self.used_concepts_path = config.OUTPUT_DIR / "used_concepts.json"
+        self.concepts: List[dict] = []
+        self._load_bank()
 
-## 🚀 Quick Start Guide
+    def _load_bank(self):
+        """Loads the 10,000+ concept offline database for instant zero-failure generation."""
+        if self.concepts_bank_path.exists():
+            try:
+                with open(self.concepts_bank_path, "r", encoding="utf-8") as f:
+                    self.concepts = json.load(f)
+                logger.info(f"[TOPIC ENGINE] Loaded {len(self.concepts)} unique concepts from bank.")
+            except Exception as e:
+                logger.warning(f"Failed to load concepts_bank.json: {e}")
+        else:
+            logger.warning("concepts_bank.json not found. Running with fallback generator.")
 
-### 1. Install Dependencies
+    def _load_used_concepts(self) -> set:
+        if self.used_concepts_path.exists():
+            try:
+                with open(self.used_concepts_path, "r", encoding="utf-8") as f:
+                    return set(json.load(f))
+            except Exception:
+                return set()
+        return set()
 
-In your terminal:
+    def _mark_used(self, title: str):
+        used = self._load_used_concepts()
+        used.add(title)
+        try:
+            with open(self.used_concepts_path, "w", encoding="utf-8") as f:
+                json.dump(list(used), f, indent=2)
+        except Exception as e:
+            logger.warning(f"Could not save used concept: {e}")
 
-```bash
-cd c:\Users\sirki\projects\gemini-shorts-automator
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-```
+    def generate_concept(self, category: Optional[str] = None) -> ShortConcept:
+        """Selects a unique concept from the expanded 10,000+ bank."""
+        chosen_category = (category or "").strip()
+        used = self._load_used_concepts()
 
-### 2. Configure Environment
+        if chosen_category and self.concepts:
+            query = chosen_category.lower()
+            matched = [
+                c for c in self.concepts
+                if query in c.get("category", "").lower()
+                or query in c.get("concept_title", "").lower()
+                or query in c.get("video_prompt", "").lower()
+                or any(query in t.lower() for t in c.get("tags", []))
+            ]
+            if matched:
+                unused = [c for c in matched if c.get("concept_title") not in used]
+                selected = random.choice(unused if unused else matched)
+                self._mark_used(selected.get("concept_title", ""))
+                return ShortConcept(**selected)
 
-Copy `.env.example` to `.env`:
+        if self.concepts:
+            unused = [c for c in self.concepts if c.get("concept_title") not in used]
+            selected = random.choice(unused if unused else self.concepts)
+            self._mark_used(selected.get("concept_title", ""))
+            return ShortConcept(**selected)
 
-```bash
-cp .env.example .env
-```
-
-Open `.env` and fill in your keys:
-
-```env
-GEMINI_API_KEY=your_actual_gemini_api_key_here  # Optional: only if generating fresh concepts online
-GEMINI_TEXT_MODEL=gemini-2.5-flash
-YOUTUBE_PRIVACY_STATUS=unlisted
-DRY_RUN=false
-```
-
----
-
-## 🔑 How to Get Your Credentials
-
-### 1. YouTube Data API v3 (`client_secret.json`)
-1. Go to [Google Cloud Console](https://console.cloud.google.com/).
-2. Create a new project (e.g. `YT-Shorts-Automator`).
-3. Enable the **YouTube Data API v3** in **APIs & Services > Library**.
-4. Go to **APIs & Services > OAuth consent screen**:
-   - Choose **External**, fill in app name and your email.
-   - Add your Google account as a **Test user**.
-5. Go to **APIs & Services > Credentials**:
-   - Click **Create Credentials > OAuth Client ID**.
-   - Application type: **Desktop app**.
-   - Name: `Shorts Uploader`.
-6. Click **Download JSON**, rename the downloaded file to `client_secret.json`, and place it in the root folder of this project (`gemini-shorts-automator/`).
-
----
-
-## 🧪 Testing & Usage
-
-### 1. Check Configuration
-Verify whether all environment variables and secrets are detected:
-```bash
-python cli.py check-env
-```
-
-### 2. Test Concept & Prompt Generation
-Preview the dynamic viral topics, visual prompts, and voiceover scripts:
-```bash
-python cli.py prompt
-# Or specify a category:
-python cli.py prompt --category "samurai"
-```
-
-### 3. Run a Dry-Run Test (Zero Cost)
-Generate 5 distinct AI scenes and assemble a full test Short:
-```bash
-python cli.py run-once --dry-run
-```
-The resulting video will be saved in `output/final/` for your review!
-
-### 4. Run Live Generation & Upload
-When your keys are configured:
-```bash
-python cli.py run-once --live
-```
-*(On your first live run, a browser window will open asking you to sign into YouTube once. After that, it generates `token.json` and runs headlessly without prompts!)*
-
----
-
-## ⏰ Automating 24 Daily Uploads (1 Video Per Hour)
-
-### Option A: Deploy to Render (24/7 Cloud Web Service & Dashboard)
-
-Run as an autonomous cloud service on [Render.com](https://render.com). This gives you:
-- **Continuous 24/7 autonomous uploads** (1 video every hour = 24 uploads daily)
-- **Live Dark-Mode Web Dashboard**: Trigger on-demand generation, monitor queue, inspect upload stats, and stream previews directly from your browser.
-- **Health check & REST API**: Endpoints at `/health`, `/status`, `/trigger`, and `/videos`.
-
-#### Step-by-Step Render Deployment:
-
-1. **Push your repository to GitHub**:
-   Ensure all changes including `Dockerfile`, `render.yaml`, and `server.py` are committed and pushed.
-
-2. **Create a New Web Service on Render**:
-   - Log into [dashboard.render.com](https://dashboard.render.com/).
-   - Click **New +** > **Web Service**.
-   - Connect your GitHub repository (`gemini-shorts-automator`).
-   - Choose **Docker** as the runtime (Render will automatically detect the included `Dockerfile` with system `ffmpeg`).
-   - Choose your plan (Free or Starter).
-
-3. **Add Environment Variables in Render Dashboard**:
-   Under the **Environment** tab in your Render service, add:
-   | Key | Value / Instructions |
-   |---|---|
-   | `PORT` | `8080` (or leave default `$PORT`) |
-   | `ENABLE_SCHEDULER` | `true` (Runs automated upload every hour) |
-   | `YOUTUBE_PRIVACY_STATUS` | `public` (or `unlisted`) |
-   | `DAILY_TARGET_SHORTS` | `24` |
-   | `YOUTUBE_CLIENT_SECRET_JSON` | Open your local `client_secret.json`, copy the entire text, and paste it here |
-   | `YOUTUBE_TOKEN_JSON` | Open your local `token.json`, copy the entire text, and paste it here |
-   | `GEMINI_API_KEY` | *(Optional)* Your Google Gemini API Key |
-   | `AI_HORDE_API_KEY` | *(Optional)* Your AI Horde API Key |
-
-4. **Keep Render Free Tier Awake 24/7**:
-   Render's free tier spins down after 15 minutes of inactivity. To keep your hourly scheduler running 24/7 for free:
-   - Create a free account at [UptimeRobot.com](https://uptimerobot.com).
-   - Add a new HTTP Monitor targeting: `https://your-service-name.onrender.com/health`
-   - Set the monitoring interval to **every 10 minutes**.
-   - *Alternative*: Upgrade to Render's **Starter** instance ($7/month) which stays running continuously without sleeping.
-
-5. **Access Your Live Dashboard**:
-   Open `https://your-service-name.onrender.com` in your browser to view your control panel!
-
----
-
-### Option B: Run Local Web Server
-
-You can also run the web server and dashboard locally on your machine:
-
-```bash
-python cli.py serve --port 8080
-```
-Then navigate to `http://localhost:8080` in your web browser.
-
----
-
-### Option C: GitHub Actions (Cloud Cron Alternative)
-A pre-configured GitHub Actions workflow is included at `.github/workflows/daily_shorts.yml`. It runs automatically in the cloud **every hour (`0 * * * *`)** to create, compose, and upload 24 Shorts a day!
-
-#### Setting Up GitHub Secrets:
-1. Push this repository to your GitHub account.
-2. In your GitHub repository, navigate to **Settings > Secrets and variables > Actions**.
-3. Under **Repository secrets**, click **New repository secret** and add:
-   - `YOUTUBE_CLIENT_SECRET_JSON`: The entire raw contents of your `client_secret.json` file.
-   - `YOUTUBE_TOKEN_JSON`: The entire raw contents of your `token.json` file.
-   - `GEMINI_API_KEY` *(Optional)*: If generating online concepts.
-   - `ELEVENLABS_API_KEY` *(Optional)*: If using ElevenLabs instead of free Edge-TTS.
-4. **Test in GitHub**:
-   - Go to the **Actions** tab in your repository.
-   - Select **Hourly YouTube Shorts Generator & Uploader (24x Daily)**.
-   - Click **Run workflow**.
-
----
-
-### Option D: Built-in Python Scheduler (Local Machine)
-Run the continuous background runner that uploads 1 video every hour:
-```bash
-python cli.py schedule
-```
-
----
-
-### Option E: Windows Task Scheduler (For Always-On PC)
-1. Open Windows **Task Scheduler** (`taskschd.msc`).
-2. Click **Create Basic Task** -> Name: `YT-Shorts-Hourly`.
-3. Trigger: **Daily**, repeat task every **1 hour** for a duration of **indefinitely**.
-4. Action: **Start a program**:
-   - Program: `python.exe`
-   - Arguments: `cli.py run-once --live`
-   - Start in: `c:\Users\sirki\projects\gemini-shorts-automator`
-
+        cat_name = chosen_category or random.choice(VIRAL_NICHES)
+        return ShortConcept(
+            category=cat_name,
+            concept_title=f"The Legend of the {cat_name.title()}",
+            video_prompt=(
+                f"Cinematic vertical 9:16 framing. An epic {cat_name} unleashing radiant celestial energy "
+                "amidst swirling storm clouds, shattered stone, and glowing embers. Dynamic low-angle tracking camera, "
+                "hyper-detailed armor textures, volumetric god rays, photorealistic 8k render."
+            ),
+            voiceover_script=f"When shadows consumed the realm, only the legendary {cat_name} could turn the tide.",
+            youtube_title=f"The Legendary {cat_name.title()} Has Awakened! #Shorts",
+            youtube_description=f"Witness the power of the {cat_name}. Subscribe for daily epic visual encounters!",
+            tags=["Shorts", cat_name.lower().replace(" ", ""), "Fantasy", "Cinematic", "AIArt", "Epic", "Storytelling"],
+        )

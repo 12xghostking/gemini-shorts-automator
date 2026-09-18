@@ -1,135 +1,549 @@
-"""Topic and Prompt Engine using a bank of 5,000+ unique cinematic Short concepts."""
+"""Build a much larger, unpredictable offline concept bank for Shorts generation.
+
+This generator intentionally expands the creative universe far beyond the previous
+5,000-item bank so the project can run for a long time without repetition.
+It produces a 10,000-concept bank with many more environments, title templates,
+and voiceover narrations while keeping the output compatible with the existing
+shorts pipeline.
+"""
 
 import json
-import random
-import logging
 from pathlib import Path
-from typing import Optional, List
-from pydantic import BaseModel, Field
 
-from src import config
+ARCHETYPES = [
+    {"name": "Solar Paladin", "category": "Holy Warriors & Crusaders", "weapon": "a radiant dawnbreaker greatsword", "power": "blinding solar wrath that splits the sky"},
+    {"name": "Moonlit Templar", "category": "Holy Warriors & Crusaders", "weapon": "a silver-haloed flamberge", "power": "a lunar crescent lance that purges shadows"},
+    {"name": "Astra Seraph", "category": "Celestial Entities & Angels", "weapon": "six flaming wings and a spear of white starfire", "power": "summoning a cathedral of light from the heavens"},
+    {"name": "Dawn Valkyrie", "category": "Norse Sky Warriors", "weapon": "a crystalline spear of morning light", "power": "calling the gates of Valhalla to open above the battlefield"},
+    {"name": "Crimson Ronin", "category": "Feudal Legends & Ronin", "weapon": "a blood-red katana forged from meteor iron", "power": "a single immortal draw that tears time itself"},
+    {"name": "Neon Kunoichi", "category": "Shadow Assassins & Rogues", "weapon": "dual razor fans and poisoned wire", "power": "vanishing between flashes of neon and striking from the dark"},
+    {"name": "Thunder Shinobi", "category": "Shadow Assassins & Rogues", "weapon": "a thundercharged ninjato", "power": "teleporting through lightning with a sonic boom slash"},
+    {"name": "Vermilion Bushi", "category": "Cyberpunk & Feudal Warriors", "weapon": "an obsidian odachi with a plasma edge", "power": "unleashing a blood-red wave of broken moonlight"},
+    {"name": "Frost Warlord", "category": "Ancient Legions & Warriors", "weapon": "a glacier axe and rune-tattooed shield", "power": "freezing the air until enemies cannot move"},
+    {"name": "Ember Monk", "category": "Martial Arts & Monks", "weapon": "a dragon-etched bo staff", "power": "turning every strike into a meteor of chi"},
+    {"name": "Abyssal Leviathan", "category": "Deep Sea Bioluminescent Leviathans", "weapon": "monolithic glowing jaws and a tail of black glass", "power": "sucking the ocean into a collapsing spiral of doom"},
+    {"name": "Obsidian Dragon", "category": "Mythical Dragons & Flying Titans", "weapon": "diamond talons and a volcano-heart chest", "power": "breathing black fire that melts stone and memory"},
+    {"name": "Phoenix Sovereign", "category": "Celestial Beasts & Avian Titans", "weapon": "molten golden feathers and a crown of light", "power": "reincarnating from cinders as a blazing star"},
+    {"name": "Rift Titan", "category": "Ancient Titans & Primordials", "weapon": "a mountain-sized hammer of fractured moonstone", "power": "splitting worlds with one step"},
+    {"name": "Nightmare Saint", "category": "Dark Fantasy & Vampires", "weapon": "a blackened holy blade wrapped in funeral silk", "power": "turning fear itself into a weapon of judgment"},
+    {"name": "Dread Necromancer", "category": "Dark Magic & Undead Hordes", "weapon": "a skull staff crowned with witchfire", "power": "raising an army of bone saints from forgotten graves"},
+    {"name": "Titan Mecha Pilot", "category": "Futuristic Mecha & Sci-Fi Warfare", "weapon": "a thermal sword larger than a tower", "power": "cutting through kaiju with a singular beam of fusion rage"},
+    {"name": "Chrono Weaver", "category": "Time Travel & Paradoxes", "weapon": "a floating hourglass baton", "power": "rewinding seconds to dodge death and strike first"},
+    {"name": "Void Stalker", "category": "Cosmic Entities & Nebula Gods", "weapon": "a blade that bends starlight", "power": "phasing through shields and warping the battlefield into a void"},
+    {"name": "Eclipse Witch", "category": "Eldritch Terrors & Abyssal Horrors", "weapon": "a moon-black staff carved from petrified tears", "power": "summoning a personal eclipse that steals breath and color"},
+    {"name": "Magma Warden", "category": "Glacial Legends & Ice Titans", "weapon": "a basalt shield and molten halberd", "power": "flooding the ground with lava and molten thunder"},
+    {"name": "Gale Harrier", "category": "Sky Realms & Mythic Beasts", "weapon": "a silver wing-spear with storm-cut edges", "power": "calling a hundred lightning winds to shred the enemy line"},
+    {"name": "Graveyard Jester", "category": "Dark Fantasy & Vampires", "weapon": "a lantern of cursed laughter and a jagged cane", "power": "turning every jest into a lethal hallucination"},
+    {"name": "Harbinger of Zero", "category": "Time Travel & Paradoxes", "weapon": "a black chronometer sealed in glass", "power": "erasing entire moments from history and from existence"},
+    {"name": "Sable Revenant", "category": "Dark Magic & Undead Hordes", "weapon": "a rusted empire blade and chain-whip", "power": "rising from ruined battlefields with the strength of a thousand lost soldiers"},
+    {"name": "Nautilus Guardian", "category": "Deep Sea Bioluminescent Leviathans", "weapon": "a coral trident and brass harpoon launcher", "power": "commanding tidal gravity with a single pulse"},
+    {"name": "Astral Cartographer", "category": "Cosmic Entities & Nebula Gods", "weapon": "a star-map staff of frozen comets", "power": "drawing new constellations that collapse enemy fleets"},
+    {"name": "Feral Werewolf Alpha", "category": "Dark Fantasy & Vampires", "weapon": "bone-clawed gauntlets and a silver chain", "power": "howling so fiercely the moon fractures into shrapnel"},
+    {"name": "Iron Colossus", "category": "Ancient Titans & Primordials", "weapon": "a siege maul forged in a dying star", "power": "crushing kingdoms beneath a single pounding step"},
+    {"name": "Velvet Assassin", "category": "Shadow Assassins & Rogues", "weapon": "a silk-wrapped garrote and hidden gravity knife", "power": "silently ending battles before the enemy sees the blade"},
+    {"name": "Null Knight", "category": "Holy Warriors & Crusaders", "weapon": "a void-etched lance of pale fire", "power": "breaking shields by turning each impact into absolute silence"},
+    {"name": "Sable Phoenix", "category": "Celestial Beasts & Avian Titans", "weapon": "a crown of ember feathers and fireglass talons", "power": "burning back to life stronger than the last death"},
+    {"name": "Midnight Samurai", "category": "Cyberpunk & Feudal Warriors", "weapon": "a moonlit katana with a reactive blade core", "power": "cutting through the future before it even arrives"},
+    {"name": "Stormcaller Priest", "category": "Holy Warriors & Crusaders", "weapon": "a thunder-rod and gospel shield", "power": "opening a storm gate full of divine lightning"},
+    {"name": "Glass Oracle", "category": "Celestial Entities & Angels", "weapon": "a prism staff wrapped in whispering light", "power": "seeing every outcome and rewriting the future"},
+    {"name": "Cinder Raider", "category": "Futuristic Mecha & Sci-Fi Warfare", "weapon": "a plasma carbine and molten grappling hook", "power": "dropping from orbit like a meteor of retaliation"},
+    {"name": "Sea of Sins Siren", "category": "Deep Sea Bioluminescent Leviathans", "weapon": "a coral shell harp and trailing eel chain", "power": "seducing ships into impossible tides and watery graves"},
+    {"name": "Warden of the Last Sun", "category": "Celestial Entities & Angels", "weapon": "a halo-crest spear forged from sunrise", "power": "burning away darkness with the final radiance of a dying star"},
+    {"name": "Crackling Centurion", "category": "Ancient Legions & Warriors", "weapon": "a lightning spear and tempered bronze shield", "power": "driving an electric phalanx across the battlefield"},
+    {"name": "Rook of the Red Rift", "category": "Eldritch Terrors & Abyssal Horrors", "weapon": "a chain sickle and fractured star prism", "power": "opening a wound in reality that devours armies"},
+    {"name": "Mirage Monk", "category": "Martial Arts & Monks", "weapon": "a silk staff wrapped in illusion threads", "power": "creating six false copies and striking from every angle"},
+    {"name": "Ashen Brawler", "category": "Ancient Legions & Warriors", "weapon": "a meteor iron gauntlet and chain flail", "power": "smashing through armor with a shockwave of rage"},
+    {"name": "Titanic Wyvern", "category": "Mythical Dragons & Flying Titans", "weapon": "raven wings and a volcanic spine", "power": "bombing enemy fortresses from the clouds"},
+    {"name": "Blackwater Admiral", "category": "Deep Sea Bioluminescent Leviathans", "weapon": "a cursed cutlass and cannon-burst anchor", "power": "commanding waves that swallow the horizon"},
+    {"name": "Nova Vanguard", "category": "Futuristic Mecha & Sci-Fi Warfare", "weapon": "a particle lance and gravitic gauntlets", "power": "bursting into a flare of impossible acceleration"},
+    {"name": "Elder Tempest Shaman", "category": "Sky Realms & Mythic Beasts", "weapon": "a staff of lightning oak and bone thunder-chimes", "power": "calling storm gods that shake the mountain range"},
+    {"name": "Gilded Executioner", "category": "Holy Warriors & Crusaders", "weapon": "a decapitating warhammer with a solar eye", "power": "striking verdicts that carve divine law into the earth"},
+    {"name": "Ghost of the Rune Sea", "category": "Dark Magic & Undead Hordes", "weapon": "a runic anchor and spectral trident", "power": "hunting souls across the dead tide"},
+    {"name": "Orbital Dragon", "category": "Cosmic Entities & Nebula Gods", "weapon": "an orbit ring and plasma breath", "power": "creating a sun-path that scorches the heavens"},
+    {"name": "Moth of the Last Bloom", "category": "Celestial Beasts & Avian Titans", "weapon": "dusty wing-swords forged from moon pollen", "power": "filling the air with luminous spores that rewrite fear"},
+    {"name": "Sorrow Advocate", "category": "Dark Fantasy & Vampires", "weapon": "a silver-and-blood crossbow", "power": "shooting arrows that poison hope itself"},
+    {"name": "Cobalt Hammer Knight", "category": "Ancient Legions & Warriors", "weapon": "a cobalt warhammer and iron shield", "power": "breaking siege walls with a single thunderclap strike"},
+    {"name": "Solar Viper", "category": "Eldritch Terrors & Abyssal Horrors", "weapon": "a coil of living lightning and black fangs", "power": "biting through armor and feeding on the heat of fear"},
+    {"name": "Kite of the Storm Crown", "category": "Sky Realms & Mythic Beasts", "weapon": "a feather kite-spear and skybreaker blade", "power": "suspending mountains in the turbulence of the wind"},
+    {"name": "Bloodglass Duelist", "category": "Cyberpunk & Feudal Warriors", "weapon": "a crimson plasma rapier", "power": "cutting with impossible precision while the world slows"},
+    {"name": "Lattice Arbiter", "category": "Time Travel & Paradoxes", "weapon": "a double-edged clock blade", "power": "executing enemies in the instant before their future forms"},
+    {"name": "Velvet Raptor", "category": "Ancient Titans & Primordials", "weapon": "a bone serrated spear and a feathered mantle", "power": "leaping a hundred feet to land with a shockwave of extinction"},
+    {"name": "Lunar Hound", "category": "Celestial Beasts & Avian Titans", "weapon": "a chain of silver stars and luminous claws", "power": "tracking enemies across impossible distances"},
+    {"name": "Ember Oracle", "category": "Cosmic Entities & Nebula Gods", "weapon": "a comet ash staff", "power": "forcing galaxies to align in one perfect strike"},
+    {"name": "Thorn Sovereign", "category": "Ancient Legions & Warriors", "weapon": "a vine-etched axe and bramble shield", "power": "growing a forest of jagged roots beneath the enemy"},
+    {"name": "Starforged Brawler", "category": "Futuristic Mecha & Sci-Fi Warfare", "weapon": "a fusion fist and kinetic shoulder cannon", "power": "turning the arena into a rain of burning debris"},
+    {"name": "Coffin Lord", "category": "Dark Magic & Undead Hordes", "weapon": "a funeral mace wrapped in grave-silk", "power": "closing the lids of the dead and making them rise again"},
+    {"name": "Murk Warden", "category": "Eldritch Terrors & Abyssal Horrors", "weapon": "a hooked abyssal blade and murky lantern", "power": "pulling truth under the water and making men drown in doubt"},
+    {"name": "Golden Yakuza", "category": "Cyberpunk & Feudal Warriors", "weapon": "a gilded katana and thermal revolver", "power": "turning a whole avenue into a crimson blaze"},
+    {"name": "Crescent Anubis", "category": "Ancient Legions & Warriors", "weapon": "a hooked khopesh of black bronze", "power": "summoning jackal shadows to hunt the enemy"},
+    {"name": "Prism Saint", "category": "Holy Warriors & Crusaders", "weapon": "a sacred rapier blazing with seven colors", "power": "purifying corruption with a final spectrum blast"},
+    {"name": "Pyre Berserker", "category": "Dark Fantasy & Vampires", "weapon": "a flaming two-hander and knuckle spikes", "power": "absorbing enemy blood and becoming a walking furnace"},
+    {"name": "Rime Executioner", "category": "Glacial Legends & Ice Titans", "weapon": "a frost-forged execution blade", "power": "freezing blood mid-flow and shattering bone on impact"},
+    {"name": "Tempest Nomad", "category": "Sky Realms & Mythic Beasts", "weapon": "a storm axe with twin spinning blades", "power": "charging the sky itself with hurricane force"},
+    {"name": "Verdant Titan", "category": "Ancient Titans & Primordials", "weapon": "a root-crowned warhammer", "power": "growing entire mountain forts from a single step"},
+    {"name": "Ravenous Wraith", "category": "Dark Magic & Undead Hordes", "weapon": "a rusted war scythe and black chain", "power": "stealing the last breath from any life form"},
+    {"name": "Aetheric Musketeer", "category": "Futuristic Mecha & Sci-Fi Warfare", "weapon": "a rifle that fires compressed starlight", "power": "shooting through shields and leaving a trail of atoms behind"},
+    {"name": "Sunforge Sentinel", "category": "Celestial Entities & Angels", "weapon": "a blazing tower shield and radiant lance", "power": "forming a wall of sunlight that bends all attacks away"},
+    {"name": "Zero-G Marine", "category": "Futuristic Mecha & Sci-Fi Warfare", "weapon": "a recoilless magnetic rifle", "power": "fighting in all directions like a living comet"},
+]
 
-logger = logging.getLogger(__name__)
+ENVIRONMENTS = [
+    "on the rain-slicked roof of a neon-drenched Tokyo skyscraper at midnight",
+    "at the edge of a crumbling gothic cathedral during a blood-red lunar eclipse",
+    "amidst a thunderous mountain peak with lightning ripping through black cloud cover",
+    "inside the abyssal depths of the Mariana Trench surrounded by glowing marine snow",
+    "inside a volcanic caldera with rivers of molten magma flowing below",
+    "across a glacier tundra beneath shimmering green aurora lights",
+    "within an ancient desert temple being consumed by a violent sandstorm",
+    "on floating shattered islands drifting around a dying star in deep space",
+    "inside an overgrown cybernetic ruin reclaimed by nature",
+    "upon a misty feudal battlefield covered in falling cherry blossoms",
+    "inside an alien crystal cavern pulsing with violet and cyan light",
+    "at the golden gates of a forgotten celestial fortress towering into the upper atmosphere",
+    "within a dystopian megacity under neon rain and holographic blimps",
+    "atop a sea cliff as 60-foot waves crash against black jagged rocks",
+    "in the eye of a cosmic nebula where gravity itself bends",
+    "inside an ancient dwarven forge with roaring blast furnaces",
+    "on the deck of a storm-battered pirate ship navigating monster-filled seas",
+    "within a cursed graveyard tangled in green phantom fog",
+    "inside a high-tech orbital station airlock overlooking Earth",
+    "on a blood-soaked Roman arena floor surrounded by roaring spectators",
+    "inside a moonlit coral temple under a black ocean sky",
+    "beneath a frozen red giant in a field of shattered ice asteroids",
+    "at the lip of a crater lake where dawn is still bleeding into the dark",
+    "across a ruined palace bridge spanning a canyon of living thunder",
+    "inside a haunted observatory with a cracked telescope pointed at the void",
+    "on a floating market street suspended over a cloud sea",
+    "within a cathedral built from fossilized dragon bones",
+    "inside a zero-gravity hospital corridor with emergency lights flashing",
+    "amidst a forest of mechanical trees in a post-apocalyptic dreamland",
+    "at the summit of a sky temple where the clouds churn like an ocean",
+    "inside a battlefield reactor chamber crackling with violet static",
+    "on a moonlit train line crossing a bridge of shattered glass",
+    "inside a sanctum carved into a colossal redwood tree",
+    "in a desert canyon where ancient statues whisper to the wind",
+    "inside a prison city hanging from the jaw of a dead leviathan",
+    "across the frozen ruins of a lost civilization under aurora flashes",
+    "in a temple suspended between two collapsing planets",
+    "amongst cascading waterfalls in a jungle of petrified stone beasts",
+    "on the deck of a floating fortress catching the first rays of a blue sun",
+    "inside a labyrinth of mirrored halls that fold back on themselves",
+    "at a ruined royal stadium where weather alive with magic roams the stands",
+    "within an ion storm twisting through a metallic canyon",
+    "in a scorched desert city with broken satellites hanging above",
+    "inside a cavern of giant crystal roots emitting ghostly blue light",
+    "on a cliffside monastery overlooking a sea of flames",
+    "amidst a shivering field of white ash under a black sun",
+    "inside an abandoned amusement park where broken carousel horses cry out",
+    "inside a haunted library where every book breathes cold smoke",
+    "on the edge of a glacier that spills into a glowing abyss",
+    "beneath a ringed planet as the sky cracks with meteor trails",
+    "inside a labyrinth of secret tunnels beneath a cratered moon",
+    "across a battlefield of floating islands tied together by chains",
+    "inside a ruined cyber temple lit by flickering holographic gods",
+    "amidst a whispering fog forest with silver mushrooms and red eyes",
+    "inside a desert fortress where gold dust dances beneath the heat haze",
+    "on a moonlit cliff road where the horizon glows with impossible light",
+    "within an extinct volcano whose heart still burns beneath the earth",
+    "inside a frozen cathedral built from ice and bone",
+    "at the mouth of an underground river where giant fish stare upward",
+    "inside a mythic garden where thorn walls grow faster than swords can cut",
+    "across a drifting iceberg city in the middle of a midnight storm",
+    "within a cosmic mausoleum lit by slow-moving funeral stars",
+    "inside a living ruin where stone walls breathe and memories echo",
+    "on the edge of a sunlit highway stretching into a war-worn horizon",
+    "within a demonic market under a cracked emerald moon",
+    "beside a chasm of frozen lightning where thunder rises from below",
+    "in a city suspended under the belly of a colossal beast",
+    "inside a shrine lit by a thousand blue candles beneath an ocean of stars",
+    "on a crystal bridge above a sea of molten glass",
+    "inside a cathedral where the stained glass is made from moonlight",
+    "within a temple garden where each tree grows giant swords",
+    "inside a cavern hanging over a magma pit with red clouds flowing like rivers",
+    "on a ruined battlefield of giants beneath a screaming red sun",
+    "within the core chamber of an old starship drifting through dead space",
+    "inside a palace built from the tusks of extinct beasts",
+    "on an iceberg glacier that slowly turns into a floating fortress",
+    "inside a scorched mausoleum where the walls are painted with battle scenes",
+    "on a cliff of black glass overlooking a sea of burning fog",
+    "amongst a forest of giant statues in a cursed valley of whispers",
+    "inside an ancient robot city consumed by rose vines and moonlight",
+    "within a storm front above a blazing mountain range",
+    "on the steps of a ruined empire palace with ghosts marching in procession",
+    "inside a celestial forge where star metal is hammered under white fire",
+    "across a canyon of broken altars lit by the flames of old gods",
+    "inside a volcanic tunnel where every rock hums with ancient power",
+    "on a bridge of frozen bones over a lake of pure black water",
+    "within a dragon burial site with floating mineral lanterns",
+    "inside a shrine of mirrored glass beneath a black-and-gold sky",
+    "amongst ruined skyships crashing into a storm cloud sea",
+    "in the ruined heart of a dead city beneath a crimson aurora",
+    "inside a dimension gate that bleeds silver light into the night",
+    "on a stormy harbor lined with broken celestial cannons",
+    "inside a cursed greenhouse where every flower is a weapon",
+    "inside a floating citadel orbiting a blue gas giant",
+    "on a battlefield of frozen lakes and glowing ruins under a pale moon",
+    "inside a throne room carved from giant petrified roots",
+    "within a fortress built from old spacecraft wreckage and memory",
+    "on a steppes ridge where prairies burn under storm lightning",
+    "inside a cavern full of giant statues that slowly awaken",
+    "in a city lit by broken suns and rain-bent neon signs",
+    "on a stone platform above a dark sea where gravity trembles",
+    "inside a ruined temple where each pillar holds a sealed memory",
+    "across a moonless battlefield with red embers rising from the earth",
+    "inside an undercity market where the walls hum with occult power",
+    "within a floating wilderness of giant mushrooms and spectral moths",
+    "inside the chamber of an ancient star clock counting down to ruin",
+    "across a canyon of broken armor and fallen towers under a pale sky",
+    "inside a crystal temple with a river of light flowing downhill",
+    "on the roof of an empire tower while the city burns beneath a black sun",
+    "inside a ringed village of ancient warriors under a violet twilight",
+    "inside a ruined fortress hanging from a mountain cliff by chains",
+    "on a dead sea with black glass ripples and floating ruins",
+    "within a city of mirrors where every reflection moves before the person does",
+    "inside an underground basilica lit by glowing bones and blue fire",
+]
 
-# Expanded rotating categories across 250+ archetypes
-VIRAL_NICHES = [
-    "Holy Warriors & Crusaders",
-    "Celestial Entities & Angels",
-    "Norse Sky Warriors",
-    "Ancient Legions & Warriors",
-    "Sky Realms & Mythic Beasts",
-    "Cyberpunk & Feudal Warriors",
-    "Shadow Assassins & Rogues",
-    "Feudal Legends & Ronin",
-    "Martial Arts & Monks",
-    "Norse Mythology & Raiders",
-    "Mythical Dragons & Flying Titans",
-    "Celestial Beasts & Avian Titans",
-    "Deep Sea Bioluminescent Leviathans",
-    "Glacial Legends & Ice Titans",
-    "Ancient Titans & Primordials",
-    "Eldritch Terrors & Abyssal Horrors",
-    "Dark Magic & Undead Hordes",
-    "Futuristic Mecha & Sci-Fi Warfare",
-    "Time Travel & Paradoxes",
-    "Neo-Tokyo & Cyberpunk",
-    "Cosmic Entities & Nebula Gods",
-    "Dark Fantasy & Vampires",
+ACTIONS = [
+    "unleashing a devastating final strike that shatters the ground into floating debris",
+    "clashing against a shadowy monster in a lethal duel that bends the air",
+    "ascending into the storm clouds surrounded by rings of explosive light",
+    "slowly drawing a legendary weapon as glowing runes awaken along the blade",
+    "defending against an overwhelming horde of nightmare beasts",
+    "plunging a weapon into an ancient seal to awaken dormant apocalypse power",
+    "dodging a deadly barrage in extreme slow motion as sparks and raindrops glow",
+    "channeling an ancient celestial spell that splits the sky wide open",
+    "stepping through a portal of raw cosmic energy onto the battlefield",
+    "surviving a catastrophic blast and standing defiant amid smoke and embers",
+    "charging forward at supersonic speed, leaving a trail of shattered shockwaves",
+    "executing an acrobatic mid-air spin that cleaves multiple armored targets",
+    "parrying a monstrous blow that creates a massive kinetic pressure wave",
+    "releasing a blinding pulse of elemental energy that burns the darkness away",
+    "standing atop a mountain of defeated foes as lightnings screams behind them",
+    "breaking the enemy formation with a single impossible leap",
+    "turning their body into a storm of motion and steel",
+    "slamming the earth hard enough to wake buried gods",
+    "burning through a collapsing gate with a single radiant burst",
+    "rushing across the battlefield like a meteor from the heavens",
+    "surging forward without fear as the sky itself falls apart",
+    "dragging a forgotten relic from silence and awakening history",
+    "walking through fire and returning untouched with a brighter glow",
+    "boxing in a horde of monsters with a halo of force and steel",
+    "cutting through three enemies in a single motion before they blink",
+    "staring death in the face and laughing while the world trembles",
+    "rising from the ground in a column of rising embers and thunder",
+    "turning the battlefield into a spinning wheel of sunlight and ruin",
+    "moving with impossible speed while shadows fail to catch up",
+    "dragging a fallen star across the sky to strike the enemy line",
+    "calling down a storm of divine fire over the entire arena",
+    "screaming a battle cry so violent it cracks the night sky",
+    "drawing a single breath before unleashing a shockwave of doom",
+    "forcing the battlefield to bend around their movement",
+    "charging a hidden power with a calm, terrifying stare",
+    "lifting a great weapon above their head like a verdict from the gods",
+    "crushing a fortress gate with one rush and one strike",
+    "using an impossible counterattack to reverse the whole tide",
+]
+
+LIGHTING_AND_STYLE = [
+    "Dynamic vertical 9:16 framing, extreme low-angle tracking camera, volumetric god rays, high-contrast chiaroscuro, photorealistic 8k render.",
+    "Cinematic vertical 9:16 aspect ratio, dizzying circular camera orbit, glowing neon reflections, rain droplets in slow motion, unreal engine 5 style.",
+    "Epic vertical 9:16 shot, rapid tilt-up motion, dramatic rim lighting, embers drifting through dark mist, hyper-detailed textures.",
+    "Cinematic vertical 9:16 framing, sweeping macro close-up to wide tracking shot, bioluminescent glow, atmospheric depth haze, 8k cinematic realism.",
+    "Vertical 9:16 composition, fast-action camera drift with subtle motion blur, high-contrast backlighting, particle physics, masterwork CGI.",
+    "Cinematic 9:16 vertical cinematography, anamorphic lens flares, moody atmospheric fog, extreme slow motion at 120fps, photorealistic textures.",
+    "Hyper-realistic 9:16 vertical shot, low-angle hero framing, golden-hour illumination, floating dust particles, blockbuster movie aesthetic.",
+    "Dramatic 9:16 composition, moonlit silhouette, subtle smoke bloom, cinematic contrast, high-detail skin and cloth shaders.",
+    "Cinematic 9:16 hero close-up then wide dramatic reveal, atmospheric volumetric haze, layered lighting, ultra-real 8K detail.",
+    "High-contrast vertical framing, lens flare streaks, glowing particles, dynamic motion blur, stylized but photoreal final image.",
+    "Epic 9:16 camera push-in, melancholic blue highlights, reflective wet surfaces, cinematic saturation, crisp ultra-detailed visuals.",
+    "Low-angle tracking with dramatic backlight, crimson glow, layered fog, cinematic depth, premium blockbuster polish.",
+    "Wide 9:16 hero shot with frame-filling motion, golden rim light, misty atmosphere, high detail, realistic texture production quality.",
+    "Super dynamic 9:16 composition, stormlight edge highlights, intense environment reflections, rich detail, master-level cinematic color grade.",
+    "Ultra-detailed 9:16 composition, metallic reflections, atmospheric smoke, cinematic lens distortion, vivid but controlled color.",
+    "Cinematic 9:16 reveal shot, dramatic contrast, floating embers, cinematic vignette, bold depth of field and hyper-real finish.",
+    "Dark and moody vertical composition, electric rim light, atmospheric haze, photoreal texture detail, action movie intensity.",
+    "Smooth 9:16 dolly motion, radiant glow, shadow separation, realistic environment depth, near-photoreal CGI finish.",
+    "Hero framing with dramatic top-down angle, volume lighting, fog bank, strong silhouette contrast, rich cinematic realism.",
+    "Dynamic 9:16 action shot with lens bloom, flying debris, wet pavement reflections, dramatic refractive lighting, high fidelity finish.",
+]
+
+VOICEOVER_NARRATIVES = [
+    "In the forgotten age of warriors, the {name} swore an unbreakable oath. Armed with {weapon}, they stood as the realm's last defense. When shadows struck, they unleashed {power}.",
+    "Ancient prophecies warned of the day the {name} would awaken. With {weapon} drawn, they took their stance. Unleashing {power}, the very foundation of reality trembled.",
+    "In a battle where one mistake means oblivion, the {name} never hesitates. Gripping {weapon}, they charged into the storm. Through {power}, victory was claimed in moments.",
+    "When all hope was gone, one lone warrior refused to bow: the {name}. Standing firm with {weapon}, they met the horde. Channeling {power}, they turned despair into victory.",
+    "They said this battle was already lost. But they forgot who ruled the frontlines: the {name}. Drawing {weapon}, they unleashed {power}.",
+    "Only once every thousand years does a strike like this occur. The legendary {name} raised {weapon} high. Channeling {power}, they tore through the enemy line.",
+    "Mortals believed the tales were myths until the {name} descended. Wielding {weapon}, they brought divine retribution. One burst of {power}, and the dark line collapsed.",
+    "Surrounded on all sides, any normal fighter would falter. But the {name} was built for the impossible. Gripping {weapon}, they unleashed {power}.",
+    "From the highest peaks to the deepest shadows, the name of the {name} commands reverence. Empowered by {weapon}, they ignited {power}.",
+    "When empires crumble, only legends stand tall. The {name} took their final stance with {weapon}. Channeling {power}, they pushed back the abyss.",
+    "The sky turned black as the {name} stepped forward. With {weapon} in hand, they unleashed {power}. A strike so pure it echoed across the world.",
+    "Trained in absolute secrecy, the {name} only emerges when the world teeters on collapse. With {weapon}, they channeled {power}.",
+    "Destiny called, and the {name} answered without fear. Locking eyes with the enemy, they drew {weapon}. Through {power}, fate itself was broken.",
+    "Some warriors rely on armor. The {name} relies on will. Raising {weapon}, they ignited {power}, shattering the battlefield into embers.",
+    "Long after the clash ends, the legend of the {name} will echo through eternity. Armed with {weapon}, they channeled {power}.",
+    "Before anyone could react, the {name} had already struck. Wielding {weapon}, they activated {power}. The duel was over in a blink.",
+    "A celestial aura engulfed the battlefield as the {name} revealed their true form. Gripping {weapon}, they unleashed {power}.",
+    "Carrying the spirits of all who came before, the {name} stepped into the fray. With {weapon} ignited, they channeled {power}.",
+    "They studied the art of war for centuries, reaching perfection as the {name}. Bearing {weapon}, they unleashed {power} and left the crowd in awe.",
+    "This is the moment everything changed. The {name} unleashed the full might of {weapon}. Channeling {power}, they made history in an instant.",
+    "No myth was ever this violent. No hero was ever this calm. The {name} raised {weapon} and unleashed {power}.",
+    "The world watched as the {name} stepped into the abyss. With {weapon} blazing, they summoned {power} and changed destiny.",
+    "When the horizon darkened and the last defense failed, the {name} rose with {weapon}. In one motion they unleashed {power}.",
+    "History calls this a battle. Legends call it the day the {name} stood alone with {weapon} and shattered every expectation through {power}.",
+    "The battlefield trembled when the {name} drew {weapon}. Then the air itself split apart as {power} tore across the horizon.",
+    "No one expected a miracle. Then the {name} appeared, {weapon} in hand, and the impossible became reality through {power}.",
+    "Their name was whispered in fear. Their weapon was {weapon}. Their final move was {power}. The {name} had arrived.",
+    "You could hear the earth groan as the {name} swung {weapon}. The answer came in the form of {power}.",
+    "Behind every ancient legend is a final battle. The {name} met the darkness with {weapon} and answered with {power}.",
+    "Every empire has one mythic defender. For this one, it was the {name}, wielding {weapon}, exploding into {power}.",
+    "The sky cracked open and the {name} stood in the middle of it. {weapon} in hand. {power} in motion.",
+    "The prophecy said the realm would fall. The {name} said otherwise, drawing {weapon} and unleashing {power}.",
+    "To the enemy, the {name} was a nightmare. To everyone else, they were a savior with {weapon} and a final answer: {power}.",
+    "In the dead of night, the {name} rose. With {weapon} raised, they summoned {power}. The dark could not hold.",
+    "The world held its breath as the {name} stepped into battle. One swing of {weapon}, one burst of {power}, and the earth itself bent.",
+    "Legends are written in blood, steel, and thunder. The {name} carried {weapon} and unleashed {power}.",
+    "The enemy had a hundred weapons. The {name} had one purpose: to stand with {weapon} and answered each attack with {power}.",
+    "There are fights fought by swords. There are fights fought by will. The {name} fought with {weapon} and {power}.",
+    "When the world turned against them, the {name} stood taller. {weapon} in hand, {power} in heart, and destiny behind them.",
+    "A single step from the {name} changed the whole battlefield. {weapon} flashed, {power} erupted, and the night melted away.",
+    "The {name} is the kind of warrior who turns fear into momentum. One look at {weapon}, one wave of {power}, and the battle is over.",
+    "This was never a fair fight. It was a reckoning. The {name} entered with {weapon} and left with {power}.",
+    "The {name} did not ask for mercy. They simply lifted {weapon}, called on {power}, and ended the storm.",
+    "Ancient kings feared the day the {name} would appear. They did, and the world watched as {weapon} and {power} reshaped the sky.",
+    "When the final hour approached, the {name} did not retreat. They raised {weapon} and answered the chaos with {power}.",
+    "The legends spoke of a weapon like {weapon}. The {name} made it real and turned it into the force of {power}.",
+    "The enemy thought they had the last move. They forgot the {name} had {weapon}, and {power} was the final word.",
+    "This is the kind of strike that rewrites history. The {name} lifted {weapon} and released {power} into the open sky.",
+    "One breath. One weapon. One impossible action. The {name} unleashed {power} and the entire battlefield changed shape.",
+    "Long before the city fell, the {name} already knew what would happen. They met it with {weapon} and answered with {power}.",
+    "The {name} was forged in pain, sharpened by battle, and armed with {weapon}. In the end, the world remember only {power}.",
+    "No legend survives without a moment like this. The {name} drew {weapon}, summoned {power}, and left the enemy with nothing but silence.",
+    "The world grew quiet the moment the {name} took a stance with {weapon}. Then {power} rolled across the field like a second sunrise.",
+    "There are moments when courage becomes a weapon. For the {name}, it was {weapon} and the overwhelming force of {power}.",
+    "In a battle where the horizon itself seemed to promise ruin, the {name} answered with {weapon} and {power}.",
+    "A true champion does not wait for fate. The {name} met it with {weapon} and shattered it with {power}.",
+    "The {name} did not come to survive. They came to dominate, with {weapon} in hand and {power} tearing through the dark.",
+    "Every storm has a center. Every legend has a final move. The {name} embodied both with {weapon} and {power}.",
+    "This was not a duel. This was judgment. The {name} stood with {weapon} and ended all doubt with {power}.",
+    "The battlefield had no more room left for miracles. Then the {name} appeared with {weapon}, and the sky answered with {power}.",
+    "The enemy expected a warrior. What they got was the {name} — a living calamity with {weapon} and the unstoppable force of {power}.",
+    "No prayer could stop the {name}. No wall could hold. With {weapon}, they unleashed {power} and changed the course of the fight.",
+    "Some names are spoken in fear. Others are spoken in awe. The {name} became both when {weapon} mirrored {power}.",
+    "The {name} carried the weight of ages in their grip. With {weapon}, they turned the whole battlefield into a weapon of {power}.",
+    "When the last flame went out, the {name} stepped from the dark with {weapon}. From there, {power} consumed the night.",
+    "The enemy realized too late that the {name} was never fighting alone. {weapon} was only the visible part. {power} was the reckoning.",
+    "The old stories were right. The {name} could stop the world with {weapon} and end it with {power}.",
+    "The realm shook beneath the feet of the {name}, whose {weapon} lit like a star while {power} crossed the battlefield like wildfire.",
+    "Nothing was left after the {name} stepped forward. Only {weapon}, only {power}, and a silence that never came back.",
+    "The {name} took a single breath, drew {weapon}, and changed the rhythm of the fight with {power}.",
+    "The battle was already lost before the {name} moved. But with {weapon} and {power}, they made the impossible look easy.",
+    "For one brief moment, the whole world seemed to watch the {name}. Then {weapon} flashed and {power} filled the sky.",
+    "In the end, legends are defined by the move that decides everything. For the {name}, it was {weapon} and {power}.",
+    "The {name} did not ask to be feared. They earned it by turning {weapon} into a promise and {power} into a verdict.",
+    "There are warriors who fight for survival. The {name} fought for a future, with {weapon} and {power} as the final answer.",
+    "The moment the {name} stepped forward, the battlefield lost its shape. {weapon} sharpened everything. {power} broke the rest.",
+]
+
+TITLE_TEMPLATES = [
+    "The {name} Awakens! ⚔️ #Shorts",
+    "When The {name} Strikes! ⚡ #Shorts",
+    "Legendary {name} Showdown 🔥 #Shorts",
+    "The Strike That Made The {name} Legendary #Shorts",
+    "No One Could Stop The {name}! #Shorts",
+    "The True Power of The {name} #Shorts",
+    "The {name}'s Final Clash! 🛡️ #Shorts",
+    "Ancient {name} Unleashed! 💥 #Shorts",
+    "The Day The {name} Appeared #Shorts",
+    "Could You Survive The {name}? #Shorts",
+    "The {name} Defies Destiny! #Shorts",
+    "Wrath of The {name} Revealed #Shorts",
+    "The Strike That Shattered The Realm: {name} #Shorts",
+    "Witness The Power of The {name}! #Shorts",
+    "When The {name} Enters The Battlefield #Shorts",
+    "The Secret Technique of The {name} #Shorts",
+    "The Undefeated {name} Strikes Again #Shorts",
+    "The {name}'s Legendary Duel #Shorts",
+    "Why The {name} Was Feared By Everyone #Shorts",
+    "The {name} Unleashes Ancient Wrath #Shorts",
+    "The {name} Knows No Mercy ⚔️ #Shorts",
+    "A Single Move From The {name} Changed Everything #Shorts",
+    "The {name} Broke The Rules of Combat #Shorts",
+    "This Is What Happens When The {name} Arrives #Shorts",
+    "The {name} Is Not Human Anymore #Shorts",
+    "The Hidden Technique of The {name} #Shorts",
+    "The {name} Was Built For This #Shorts",
+    "The Final Judgment of The {name} #Shorts",
+    "The {name} Survived The Impossible #Shorts",
+    "The Blade of The {name} Is A Warning #Shorts",
+    "The {name} Is The End of The Story #Shorts",
+    "One Glance From The {name} Ends The Fight #Shorts",
+    "The {name} Took The Storm With Them #Shorts",
+    "When The {name} Smiles, The World Trembles #Shorts",
+    "The {name} Writes New Rules In Blood #Shorts",
+    "No One Can Stand Against The {name} #Shorts",
+    "The {name} Awakens A New Era #Shorts",
+    "The Last Stand of The {name} #Shorts",
+    "The {name} Came To Burn The Sky #Shorts",
+    "This Is Why The {name} Was Feared #Shorts",
+    "The {name} Refused To Fall #Shorts",
+    "The {name} Turned The Night Into Fire #Shorts",
+    "The {name} Won Before The Fight Began #Shorts",
+    "A Final Strike From The {name} Changed The World #Shorts",
+    "The {name} Stands Beyond Destiny #Shorts",
+    "The {name} Was Never Meant To Lose #Shorts",
+    "The {name} Stood Alone Against Doom #Shorts",
+    "The {name} Is The Horizon Of Fear #Shorts",
+    "The {name} Is The Last Great Warning #Shorts",
+    "The {name} Is The Storm Before The Storm #Shorts",
+    "The {name} Makes The Impossible Look Easy #Shorts",
+    "The {name} Delivers Judgment #Shorts",
+    "One Step From The {name} And The Fight Is Over #Shorts",
+    "The {name} Rewrites The Laws of War #Shorts",
+    "The Battle Was Won When The {name} Appeared #Shorts",
+    "The {name} Took A Breath And The Sky Split #Shorts",
+    "The {name} Threw Away Mercy #Shorts",
+    "There Is No Escape From The {name} #Shorts",
+    "The {name} Is The Sound Of Finality #Shorts",
+    "The {name} Took The Darkness With Them #Shorts",
+    "The {name} Walked Through Hell #Shorts",
+    "The {name}'s Last Stand Is Unstoppable #Shorts",
+    "The {name} Knows No Limit #Shorts",
+    "The {name} Sets The Sky On Fire #Shorts",
+    "The {name} Crossed The Horizon #Shorts",
+    "The {name} Turned Thunder Into Steel #Shorts",
+    "The {name} Was The Storm #Shorts",
+    "The {name} Came To End The Age #Shorts",
+    "The {name} Leaves A Scar In The Sky #Shorts",
+    "When The {name} Draws, The World Stops #Shorts",
+    "The {name} Is The Last Warning #Shorts",
+    "The {name} Opened The Gates of Ruin #Shorts",
+    "The {name} Changed The Weather of Fate #Shorts",
+    "The {name} Is The Name of Doom #Shorts",
+    "The {name} Is The End of Everything #Shorts",
+    "The {name} Is A Living Cataclysm #Shorts",
+    "The {name} Shook The Heavens #Shorts",
+    "The {name} Carved A New Future #Shorts",
+    "The {name} Broke the Silence #Shorts",
+    "The {name} Made Ruin Look Beautiful #Shorts",
+    "The {name} Does Not Retreat #Shorts",
+    "When The {name} Moves, The Earth Obeys #Shorts",
+    "The {name} Is Written In Fire #Shorts",
+    "The {name} Turns Chaos Into Victory #Shorts",
+    "The {name} Stares Through The Void #Shorts",
+    "The {name} Ascended In Full Glory #Shorts",
+    "The {name} Broke The Night Open #Shorts",
+    "The {name} Was Designed to Destroy #Shorts",
+    "The {name} Cannot Be Stopped #Shorts",
+    "The {name} Brought The Sky Down #Shorts",
+    "The {name} Is The Real Final Boss #Shorts",
+    "The {name} Strikes First, Wins Last #Shorts",
+    "The {name} Is A Legend In Motion #Shorts",
+    "This Is The Day The {name} Returned #Shorts",
+    "A Warning From The {name} #Shorts",
+    "The {name} Is Not a Hero. It Is A Storm. #Shorts",
+    "The {name} Shattered the Horizon #Shorts",
+    "The {name} Walked Through The Fire #Shorts",
+    "The {name} Refused To Die #Shorts",
+    "The {name} Turns Fear Into Fury #Shorts",
+    "The {name} Hunted The Sky Itself #Shorts",
+    "The {name} Rises Like A Prophecy #Shorts",
+    "The {name} Ended The Era #Shorts",
+    "The {name} Makes Destiny Nervous #Shorts",
+    "The {name} Has No Weakness #Shorts",
+    "The {name} Plays With Time #Shorts",
+    "The {name} Came To Judge The World #Shorts",
+    "The {name} Leaves A Trail of Ash #Shorts",
+    "The {name} Turns A Battlefield Into A Legend #Shorts",
+    "The {name} Makes The Heavens Tremble #Shorts",
+    "The {name} Has Already Won #Shorts",
+    "The {name} Is A Storm Of Steel #Shorts",
+    "The {name} Opens The Gates Of War #Shorts",
+    "The {name} Is The Last Hero Of The Age #Shorts",
+    "The {name} Sings A Final Warning #Shorts",
+    "The {name} Touched The Sky And Nothing Was The Same #Shorts",
+    "The {name} Wields Eternity #Shorts",
+    "The {name} Is The Echo of Doom #Shorts",
+    "The {name} Brought The End of Silence #Shorts",
+    "The {name} Was Written By Thunder #Shorts",
+    "The {name} Is The Last Thing You See #Shorts",
+    "The {name} Moves Like Fate #Shorts",
+    "The {name} Is The Price Of Survival #Shorts",
+    "The {name} Ends The Night #Shorts",
 ]
 
 
-class ShortConcept(BaseModel):
-    category: str
-    concept_title: str
-    video_prompt: str = Field(description="Detailed visual prompt for AI video/image generator in 9:16 vertical format")
-    voiceover_script: str = Field(description="10-25 word gripping narrative hook")
-    youtube_title: str = Field(description="Catchy Short title including #Shorts")
-    youtube_description: str
-    tags: List[str]
+def generate_10000_concepts(output_file: Path, total_concepts: int = 10000):
+    concepts = []
+    seen_prompts = set()
 
+    for index in range(total_concepts):
+        arch = ARCHETYPES[index % len(ARCHETYPES)]
+        name = arch["name"]
+        category = arch["category"]
+        weapon = arch["weapon"]
+        power = arch["power"]
+        clean_name = name.replace(" ", "")
 
-class TopicEngine:
-    def __init__(self, api_key: Optional[str] = None):
-        self.concepts_bank_path = config.ASSETS_DIR / "concepts_bank.json"
-        self.used_concepts_path = config.OUTPUT_DIR / "used_concepts.json"
-        self.concepts: List[dict] = []
-        self._load_bank()
-
-    def _load_bank(self):
-        """Loads the 5,000+ concept offline database for instant, zero-failure concept generation."""
-        if self.concepts_bank_path.exists():
-            try:
-                with open(self.concepts_bank_path, "r", encoding="utf-8") as f:
-                    self.concepts = json.load(f)
-                logger.info(f"[TOPIC ENGINE] Loaded {len(self.concepts)} unique concepts from bank.")
-            except Exception as e:
-                logger.warning(f"Failed to load concepts_bank.json: {e}")
-        else:
-            logger.warning("concepts_bank.json not found. Running with fallback generator.")
-
-    def _load_used_concepts(self) -> set:
-        if self.used_concepts_path.exists():
-            try:
-                with open(self.used_concepts_path, "r", encoding="utf-8") as f:
-                    return set(json.load(f))
-            except Exception:
-                return set()
-        return set()
-
-    def _mark_used(self, title: str):
-        used = self._load_used_concepts()
-        used.add(title)
-        try:
-            with open(self.used_concepts_path, "w", encoding="utf-8") as f:
-                json.dump(list(used), f, indent=2)
-        except Exception as e:
-            logger.warning(f"Could not save used concept: {e}")
-
-    def generate_concept(self, category: Optional[str] = None) -> ShortConcept:
-        """
-        Instantly selects a unique concept from the 5,000+ database,
-        guaranteeing zero repeated voiceovers and instant response.
-        """
-        chosen_category = (category or "").strip()
-        used = self._load_used_concepts()
-
-        # If user specified a category (e.g. "paladin", "samurai", "dragon")
-        if chosen_category and self.concepts:
-            query = chosen_category.lower()
-            # Filter concepts matching category, title, prompt, or tags
-            matched = [
-                c for c in self.concepts
-                if query in c.get("category", "").lower()
-                or query in c.get("concept_title", "").lower()
-                or query in c.get("video_prompt", "").lower()
-                or any(query in t.lower() for t in c.get("tags", []))
-            ]
-            if matched:
-                # Prioritize concepts that haven't been used yet
-                unused = [c for c in matched if c.get("concept_title") not in used]
-                selected = random.choice(unused if unused else matched)
-                self._mark_used(selected.get("concept_title", ""))
-                return ShortConcept(**selected)
-
-        # If no specific category or no match in bank, pick from unused in the 5,000
-        if self.concepts:
-            unused = [c for c in self.concepts if c.get("concept_title") not in used]
-            selected = random.choice(unused if unused else self.concepts)
-            self._mark_used(selected.get("concept_title", ""))
-            return ShortConcept(**selected)
-
-        # Dynamic algorithmic fallback if bank is not present
-        cat_name = chosen_category or random.choice(VIRAL_NICHES)
-        return ShortConcept(
-            category=cat_name,
-            concept_title=f"The Legend of the {cat_name.title()}",
-            video_prompt=(
-                f"Cinematic vertical 9:16 framing. An epic {cat_name} unleashing radiant celestial energy "
-                "amidst swirling storm clouds, shattered stone, and glowing embers. Dynamic low-angle tracking camera, "
-                "hyper-detailed armor textures, volumetric god rays, photorealistic 8k render."
-            ),
-            voiceover_script=f"When shadows consumed the realm, only the legendary {cat_name} could turn the tide.",
-            youtube_title=f"The Legendary {cat_name.title()} Has Awakened! #Shorts",
-            youtube_description=f"Witness the power of the {cat_name}. Subscribe for daily epic visual encounters!",
-            tags=["Shorts", cat_name.lower().replace(" ", ""), "Fantasy", "Cinematic", "AIArt", "Epic", "Storytelling"]
+        env = ENVIRONMENTS[(index * 17 + len(name)) % len(ENVIRONMENTS)]
+        act = ACTIONS[(index * 23 + len(name)) % len(ACTIONS)]
+        style = LIGHTING_AND_STYLE[(index * 13 + len(name)) % len(LIGHTING_AND_STYLE)]
+        hook = VOICEOVER_NARRATIVES[(index * 29 + len(name)) % len(VOICEOVER_NARRATIVES)].format(
+            name=name,
+            weapon=weapon,
+            power=power,
         )
+        title = TITLE_TEMPLATES[(index * 31 + len(name)) % len(TITLE_TEMPLATES)].format(name=name)
+
+        prompt = (
+            f"Cinematic vertical 9:16 framing. A legendary {name} wielding {weapon} {env}. "
+            f"The subject is {act}, channeling {power}. {style}"
+        )
+
+        if prompt in seen_prompts:
+            prompt = f"{prompt} Sequence {index + 1}"
+        seen_prompts.add(prompt)
+
+        concept_title = f"{name}: {act.split()[0].title()} of Destiny"
+        description = (
+            f"Witness the power of the {name} as an ancient legend erupts across the battlefield. "
+            f"Created with cinematic AI storytelling for maximum viewer retention. Subscribe for more epic short-form stories! #Shorts #{clean_name}"
+        )
+        tags = [
+            "Shorts",
+            clean_name,
+            "Cinematic",
+            "Epic",
+            "AIArt",
+            "Storytelling",
+            category.lower().replace(" & ", "-").replace(" ", "-"),
+            "Legend",
+            "Action",
+            "Fantasy",
+        ]
+
+        concepts.append(
+            {
+                "category": category,
+                "concept_title": concept_title,
+                "video_prompt": prompt,
+                "voiceover_script": hook,
+                "youtube_title": title,
+                "youtube_description": description,
+                "tags": tags,
+            }
+        )
+
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_file, "w", encoding="utf-8") as handle:
+        json.dump(concepts, handle, indent=2)
+
+    print(f"Successfully generated {len(concepts)} unique Short concepts into {output_file}!")
+    print(f"Built from {len({concept['category'] for concept in concepts})} categories and {len(ARCHETYPES)} archetypes.")
+
+
+if __name__ == "__main__":
+    destination = Path(__file__).resolve().parent / "assets" / "concepts_bank.json"
+    generate_10000_concepts(destination, total_concepts=10000)
