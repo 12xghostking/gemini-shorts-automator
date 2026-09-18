@@ -27,6 +27,15 @@ on:
         required: false
         default: true
         type: boolean
+      privacy:
+        description: 'YouTube privacy status'
+        required: false
+        default: 'public'
+        type: choice
+        options:
+          - public
+          - unlisted
+          - private
 
 jobs:
   generate-and-upload:
@@ -59,7 +68,7 @@ jobs:
           YOUTUBE_CLIENT_SECRET_JSON: ${{ secrets.YOUTUBE_CLIENT_SECRET_JSON }}
           YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
-          YOUTUBE_PRIVACY_STATUS: ${{ vars.YOUTUBE_PRIVACY_STATUS || 'unlisted' }}
+          YOUTUBE_PRIVACY_STATUS: ${{ vars.YOUTUBE_PRIVACY_STATUS || inputs.privacy || 'public' }}
           PYTHONUNBUFFERED: "1"
         run: |
           ARGS=""
@@ -77,9 +86,14 @@ jobs:
             if [ "${{ inputs.upload }}" = "false" ]; then
               ARGS="$ARGS --no-upload"
             fi
+            if [ -n "${{ inputs.privacy }}" ]; then
+              ARGS="$ARGS --privacy \"${{ inputs.privacy }}\""
+            else
+              ARGS="$ARGS --privacy \"public\""
+            fi
           else
-            # Scheduled run defaults to live generation and upload
-            ARGS="--live"
+            # Scheduled run defaults to live generation and public upload
+            ARGS="--live --privacy \"public\""
           fi
 
           echo "Running: python cli.py run-once $ARGS"

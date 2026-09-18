@@ -22,7 +22,7 @@ class ShortsPipeline:
         self.composer = VideoComposer()
         self.youtube_engine = YouTubeEngine()
 
-    def run_single(self, category: Optional[str] = None, upload: bool = True) -> Dict[str, Any]:
+    def run_single(self, category: Optional[str] = None, upload: bool = True, privacy_status: Optional[str] = None) -> Dict[str, Any]:
         """Runs a complete cycle from concept to YouTube upload."""
         logger.info("=" * 60)
         logger.info(f"[START] SHORTS CREATION PIPELINE (Dry-Run: {self.dry_run})")
@@ -68,6 +68,7 @@ class ShortsPipeline:
                 title=concept.youtube_title,
                 description=concept.youtube_description,
                 tags=concept.tags,
+                privacy_status=privacy_status,
                 dry_run=self.dry_run
             )
         else:
