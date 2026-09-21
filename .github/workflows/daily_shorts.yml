@@ -3,7 +3,7 @@ name: Hourly YouTube Shorts Generator & Uploader (24x Daily)
 on:
   schedule:
     # Runs every hour at minute 18 (off-peak to avoid GitHub top-of-hour :00 delays)
-    - cron: '18 * * * *'
+    - cron: '25 * * * *'
       timezone: 'Asia/Kolkata'
 
   workflow_dispatch:
@@ -40,6 +40,9 @@ jobs:
     timeout-minutes: 30
 
     steps:
+      - name: Schedule Test
+        run: echo "SCHEDULE TRIGGERED"
+        
       - name: Checkout Repository
         uses: actions/checkout@v4
 
