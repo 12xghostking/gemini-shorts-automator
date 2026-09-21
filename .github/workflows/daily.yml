@@ -2,9 +2,11 @@ name: Hourly YouTube Shorts Generator
 
 on:
   schedule:
-    # Runs every hour at minute 18 (off-peak to avoid GitHub top-of-hour :00 delays)
+    # Runs every hour at minute 40 UTC (GitHub Actions only supports UTC cron)
     - cron: '40 * * * *'
-      timezone: 'Asia/Kolkata'
+
+  repository_dispatch:
+    types: [trigger-shorts, daily-run]
 
   workflow_dispatch:
     inputs:
