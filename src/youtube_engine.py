@@ -29,7 +29,7 @@ class YouTubeEngine:
             with open(self.token_path, "w", encoding="utf-8") as f:
                 f.write(token_env)
 
-    def authenticate(self) -> bool:
+    def authenticate(self, force_reauth: bool = False) -> bool:
         """Authenticates with YouTube Data API v3 using OAuth 2.0."""
         from google.oauth2.credentials import Credentials
         from google_auth_oauthlib.flow import InstalledAppFlow
@@ -37,14 +37,14 @@ class YouTubeEngine:
         from googleapiclient.discovery import build
 
         creds = None
-        if self.token_path.exists():
+        if not force_reauth and self.token_path.exists():
             try:
                 creds = Credentials.from_authorized_user_file(str(self.token_path), SCOPES)
             except Exception as e:
                 logger.warning(f"Existing token is invalid: {e}")
 
         if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
+            if not force_reauth and creds and creds.expired and creds.refresh_token:
                 try:
                     creds.refresh(Request())
                 except Exception as e:
@@ -56,10 +56,10 @@ class YouTubeEngine:
                     logger.warning(f"YouTube credentials '{self.client_secret_path}' not found.")
                     return False
                 flow = InstalledAppFlow.from_client_secrets_file(str(self.client_secret_path), SCOPES)
-                creds = flow.run_local_server(port=0)
+                creds = flow.run_local_server(port=0, prompt="consent", access_type="offline")
 
             # Save credentials for next run
-            with open(self.token_path, "w") as token_file:
+            with open(self.token_path, "w", encoding="utf-8") as token_file:
                 token_file.write(creds.to_json())
 
         self.youtube_service = build("youtube", "v3", credentials=creds)

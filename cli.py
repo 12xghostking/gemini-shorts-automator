@@ -46,7 +46,26 @@ def check_env():
     table.add_row("YouTube client_secret.json", "[OK] Found" if secret_exists else "[WARNING] Not Found (Required for live upload)")
 
     token_exists = (config.PROJECT_ROOT / config.YOUTUBE_TOKEN_FILE).exists()
-    table.add_row("YouTube token.json", "[OK] Authenticated" if token_exists else "[PENDING] First-Time Login")
+    token_status = "[PENDING] First-Time Login (run 'python cli.py auth')"
+    if token_exists:
+        try:
+            from google.oauth2.credentials import Credentials
+            from google.auth.transport.requests import Request
+            from src.youtube_engine import SCOPES
+            creds = Credentials.from_authorized_user_file(str(config.PROJECT_ROOT / config.YOUTUBE_TOKEN_FILE), SCOPES)
+            if creds.valid:
+                token_status = "[OK] Authenticated (Valid)"
+            elif creds.refresh_token:
+                try:
+                    creds.refresh(Request())
+                    token_status = "[OK] Authenticated (Refreshed)"
+                except Exception:
+                    token_status = "[EXPIRED / REVOKED] Run 'python cli.py auth'"
+            else:
+                token_status = "[EXPIRED] Needs fresh login (run 'python cli.py auth')"
+        except Exception:
+            token_status = "[INVALID] Corrupt token (run 'python cli.py auth')"
+    table.add_row("YouTube token.json", token_status)
 
     table.add_row("TTS Engine", config.TTS_ENGINE)
     table.add_row("Edge-TTS Voice", config.EDGE_TTS_VOICE)
@@ -86,8 +105,52 @@ def run_once(category, dry_run, upload, privacy, engine):
     result = pipeline.run_single(category=category, upload=upload, privacy_status=privacy, engine=engine)
     console.print("[bold green]Pipeline execution completed successfully![/bold green]")
 
+@cli.command()
+@click.option("--force", is_flag=True, default=True, help="Force fresh OAuth authorization flow.")
+def auth(force):
+    """Authenticate with YouTube Data API v3 and generate/refresh token.json."""
+    from src.youtube_engine import YouTubeEngine
+    from src import config
+    import json
 
+    console.print(Panel.fit(
+        "[bold cyan]YouTube OAuth Authentication[/bold cyan]\n\n"
+        "A browser window will open for you to sign in with your Google Account\n"
+        "and grant upload permissions for your YouTube channel.",
+        title="YouTube Auth"
+    ))
 
+    secret_path = config.PROJECT_ROOT / config.YOUTUBE_CLIENT_SECRET_FILE
+    if not secret_path.exists():
+        console.print(f"[bold red]Error:[/bold red] '{secret_path.name}' not found in project root!")
+        console.print("Please place your OAuth client secret JSON from Google Cloud Console as client_secret.json.")
+        return
+
+    engine = YouTubeEngine()
+    try:
+        success = engine.authenticate(force_reauth=force)
+        if success and engine.token_path.exists():
+            console.print("\n[bold green]✓ Successfully authenticated and created token.json![/bold green]\n")
+
+            with open(engine.token_path, "r", encoding="utf-8") as f:
+                token_data = json.load(f)
+            minified_token = json.dumps(token_data)
+
+            console.print(Panel(
+                f"[bold yellow]1. Local Authentication:[/bold yellow] [green]Saved to token.json[/green]\n\n"
+                f"[bold yellow]2. For GitHub Actions / CI Secret:[/bold yellow]\n"
+                f"Copy the string below and update your GitHub repository secret named [bold cyan]YOUTUBE_TOKEN_JSON[/bold cyan]:\n\n"
+                f"{minified_token}\n\n"
+                f"[bold magenta]⚡ How to Prevent 7-Day Token Expiration:[/bold magenta]\n"
+                f"If your Google Cloud OAuth consent screen is in '[bold red]Testing[/bold red]' status, tokens expire every 7 days.\n"
+                f"To make tokens permanent:\n"
+                f"1. Go to Google Cloud Console -> [bold cyan]APIs & Services > OAuth consent screen[/bold cyan]\n"
+                f"2. Under Publishing status, click '[bold green]Publish App[/bold green]' (switch to In Production).\n"
+                f"3. Your refresh token will now never expire automatically!",
+                title="Authentication Complete"
+            ))
+    except Exception as e:
+        console.print(f"[bold red]Authentication failed:[/bold red] {e}")
 
 @cli.command()
 @click.option("--file", "-f", default=None, help="Path to video file to upload (defaults to latest final Short)")

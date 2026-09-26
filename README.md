@@ -93,6 +93,22 @@ DRY_RUN=false
    - Name: `Shorts Uploader`.
 6. Click **Download JSON**, rename the downloaded file to `client_secret.json`, and place it in the root folder of this project (`gemini-shorts-automator/`).
 
+### 2. Generate YouTube Token (`token.json`)
+Run the authentication helper:
+```bash
+python cli.py auth
+```
+A browser window will open for you to sign in with your Google account and authorize permissions. Once authorized, `token.json` is automatically generated.
+
+> [!TIP]
+> **How to Prevent 7-Day Token Expiration in GitHub Actions / Production:**
+> If your Google Cloud OAuth Consent Screen is left in **"Testing"** status, Google will automatically expire refresh tokens every **7 days** with `invalid_grant: Token has been expired or revoked`.
+> To make your token permanent:
+> 1. In [Google Cloud Console](https://console.cloud.google.com/), go to **APIs & Services > OAuth consent screen**.
+> 2. Under **Publishing status**, click **Publish App** (switch to **In Production**).
+> 3. Run `python cli.py auth` to generate a permanent refresh token.
+> 4. If using GitHub Actions, copy the printed minified JSON string and update your repository secret `YOUTUBE_TOKEN_JSON`.
+
 ---
 
 ## 🧪 Testing & Usage
