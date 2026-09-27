@@ -38,34 +38,59 @@ jobs:
     timeout-minutes: 30
 
     steps:
+      # Optional: set the ALLOWED_UTC_HOURS repo variable (e.g. "6,14") to post only in those UTC hours.
+      # Leave it unset to run on every trigger (current behavior).
+      - name: Optional hour gate
+        id: gate
+        env:
+          ALLOWED_UTC_HOURS: ${{ vars.ALLOWED_UTC_HOURS }}
+        run: |
+          if [ -n "$ALLOWED_UTC_HOURS" ]; then
+            HOUR=$(date -u +%H | sed 's/^0//')
+            case ",$ALLOWED_UTC_HOURS," in
+              *",$HOUR,"*) echo "run=true" >> "$GITHUB_OUTPUT" ;;
+              *) echo "run=false" >> "$GITHUB_OUTPUT"; echo "Hour $HOUR UTC not in ALLOWED_UTC_HOURS ($ALLOWED_UTC_HOURS), skipping." ;;
+            esac
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Schedule Test
+        if: steps.gate.outputs.run == 'true'
         run: echo "SCHEDULE TRIGGERED"
         
       - name: Checkout Repository
+        if: steps.gate.outputs.run == 'true'
         uses: actions/checkout@v4
 
       - name: Set up Python 3.12
+        if: steps.gate.outputs.run == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           cache: 'pip'
 
       - name: Install System Dependencies (FFmpeg)
+        if: steps.gate.outputs.run == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
 
       - name: Install Python Dependencies
+        if: steps.gate.outputs.run == 'true'
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
       - name: Run Shorts Automator Pipeline
+        if: steps.gate.outputs.run == 'true'
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           YOUTUBE_CLIENT_SECRET_JSON: ${{ secrets.YOUTUBE_CLIENT_SECRET_JSON }}
           YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          HORDE_API_KEY: ${{ secrets.HORDE_API_KEY }}
+          SHORTS_CATEGORY: ${{ vars.SHORTS_CATEGORY }}
           YOUTUBE_PRIVACY_STATUS: ${{ vars.YOUTUBE_PRIVACY_STATUS || inputs.privacy || 'public' }}
           PYTHONUNBUFFERED: "1"
         run: |
@@ -93,6 +118,10 @@ jobs:
           else
             # Scheduled run defaults to live generation and public upload
             ARGS="--live --privacy \"public\""
+            # Optional: pin a niche via the SHORTS_CATEGORY repo variable (e.g. "Neo-Tokyo")
+            if [ -n "$SHORTS_CATEGORY" ]; then
+              ARGS="$ARGS --category \"$SHORTS_CATEGORY\""
+            fi
           fi
 
           echo "Running: python cli.py run-once $ARGS"

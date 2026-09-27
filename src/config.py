@@ -30,6 +30,19 @@ GEMINI_TEXT_MODEL = os.getenv("GEMINI_TEXT_MODEL", "gemini-2.5-flash")
 VIDEO_ENGINE = "free"
 NUM_SCENES = int(os.getenv("NUM_SCENES", "5"))
 
+# AI Horde settings. Register a free key at aihorde.net for much higher
+# priority than the anonymous default, and set it as the HORDE_API_KEY secret.
+HORDE_API_KEY = os.getenv("HORDE_API_KEY", "0000000000").strip()
+HORDE_MODEL = os.getenv("HORDE_MODEL", "AlbedoBase XL (SDXL)").strip()
+
+# Safety: appended to every Horde prompt as a negative prompt (### syntax)
+# to reduce policy-flagged imagery reaching the channel.
+SAFETY_NEGATIVE_PROMPT = os.getenv(
+    "SAFETY_NEGATIVE_PROMPT",
+    "nsfw, nudity, nude, sexual, suggestive, revealing clothing, cleavage, "
+    "lingerie, gore, dismemberment, child, minor, deformed, watermark, text overlay"
+).strip()
+
 
 
 # YouTube Settings

@@ -101,13 +101,14 @@ class VideoEngine:
         # Method 2: Resilient retry loop with backoff for any remaining scenes (filters out any censored images)
         if len(image_paths) < count:
             logger.info(f"   [AI IMAGES] Generating remaining {count - len(image_paths)} distinct scenes...")
+            # Lead with high-impact shots: the first rendered frame decides swipe-through
             scene_modifiers = [
-                "wide panoramic establishing shot, dark storm clouds, volumetric god rays",
-                "intense macro close-up portrait, glowing eyes, intricate armor details",
                 "high-speed dynamic combat action shot, flying debris, motion blur",
+                "intense macro close-up portrait, glowing eyes, intricate armor details",
                 "epic low-angle hero shot, unleashing glowing elemental energy shockwaves",
-                "cinematic silhouette wide shot, standing victorious amidst embers and dust",
-                "aerial top-down dramatic view, shattered environment, neon reflections"
+                "aerial top-down dramatic view, shattered environment, neon reflections",
+                "wide panoramic establishing shot, dark storm clouds, volumetric god rays",
+                "cinematic silhouette wide shot, standing victorious amidst embers and dust"
             ]
 
             attempt_idx = 0
@@ -128,7 +129,7 @@ class VideoEngine:
                 try:
                     seed = random.randint(1000, 999999)
                     encoded_p = urllib.parse.quote(clean_p)
-                    url = f"https://image.pollinations.ai/prompt/{encoded_p}?width=720&height=1280&nologo=true&seed={seed}"
+                    url = f"https://image.pollinations.ai/prompt/{encoded_p}?width=720&height=1280&nologo=true&safe=true&seed={seed}"
                     req = urllib.request.Request(
                         url,
                         headers={"User-Agent": f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) ShortsBot/{seed % 100}"}
@@ -191,14 +192,22 @@ class VideoEngine:
     def _fetch_horde_batch(self, prompt: str, count: int = 5, max_wait_seconds: int = 105) -> List[str]:
         """Submits a batch generation job to AI Horde and waits for completed, uncensored image URLs."""
         url = "https://aihorde.net/api/v2/generate/async"
+        # Everything after '###' is treated as a negative prompt by AI Horde
+        safe_prompt = (
+            f"{prompt}, vertical 9:16 framing, masterpiece, photorealistic, 8k, cinematic lighting"
+            f"### {config.SAFETY_NEGATIVE_PROMPT}"
+        )
         payload = json.dumps({
-            "prompt": f"{prompt}, vertical 9:16 framing, masterpiece, photorealistic, 8k, cinematic lighting",
-            "params": {"width": 512, "height": 768, "steps": 15, "n": count}
+            "prompt": safe_prompt,
+            "params": {"width": 576, "height": 1024, "steps": 25, "n": count},
+            "models": [config.HORDE_MODEL] if config.HORDE_MODEL else [],
+            "nsfw": False,
+            "censor_nsfw": True
         }).encode("utf-8")
 
         headers = {
             "Content-Type": "application/json",
-            "apikey": "0000000000",
+            "apikey": config.HORDE_API_KEY or "0000000000",
             "User-Agent": "ShortsAutomator/2.0"
         }
 
