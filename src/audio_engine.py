@@ -13,52 +13,47 @@ from src import config
 
 logger = logging.getLogger(__name__)
 
-# Curated profiles for dramatic, cinematic, non-robotic narration
+# Curated profiles for engaging, conversational, high-retention narration
 DRAMATIC_VOICE_PROFILES: Dict[str, Dict[str, str]] = {
-    "en-US-GuyNeural": {
-        "rate": "-4%",
-        "pitch": "-3Hz",
-        "name": "Guy (Movie Trailer Deep)"
+    "en-US-AndrewNeural": {
+        "rate": "+1%",
+        "pitch": "+0Hz",
+        "name": "Andrew (Conversational Explainer)"
+    },
+    "en-US-BrianNeural": {
+        "rate": "+2%",
+        "pitch": "+0Hz",
+        "name": "Brian (Engaging Storyteller)"
     },
     "en-US-ChristopherNeural": {
-        "rate": "-4%",
-        "pitch": "-2Hz",
-        "name": "Christopher (Epic Lorekeeper)"
+        "rate": "+1%",
+        "pitch": "+0Hz",
+        "name": "Christopher (Authoritative Fact Narrator)"
     },
-    "en-GB-RyanNeural": {
-        "rate": "-3%",
-        "pitch": "-2Hz",
-        "name": "Ryan (British Fantasy Narrator)"
+    "en-US-GuyNeural": {
+        "rate": "+0%",
+        "pitch": "+0Hz",
+        "name": "Guy (Dynamic American Narrator)"
     },
-    "en-US-EricNeural": {
-        "rate": "-3%",
-        "pitch": "-1Hz",
-        "name": "Eric (Intense Battlefield Action)"
-    },
-    "en-GB-ThomasNeural": {
-        "rate": "-5%",
-        "pitch": "-3Hz",
-        "name": "Thomas (Ancient Myth Chronicler)"
+    "en-US-AvaNeural": {
+        "rate": "+1%",
+        "pitch": "+0Hz",
+        "name": "Ava (Expressive Natural Narrator)"
     }
 }
 
 
 def format_dramatic_narration(text: str) -> str:
-    """Pre-processes narration text to introduce natural dramatic pauses, cadence, and tension,
+    """Pre-processes narration text to introduce natural conversational pauses, cadence, and tension,
     preventing flat robotic reading in Edge-TTS.
     """
     cleaned = text.strip().strip('"').strip("'")
 
-    # Replace em-dashes and long dashes with anticipatory breath pauses
-    cleaned = re.sub(r'\s*[—–]{1,2}\s*', ' ... ', cleaned)
-
-    # Add breath pauses for dramatic conjunctions
-    for conj in ["reminding the world", "before the realm", "and in doing so"]:
-        if conj in cleaned and f" ... {conj}" not in cleaned:
-            cleaned = cleaned.replace(f" {conj}", f" ... {conj}")
+    # Replace em-dashes and long dashes with brief natural pauses
+    cleaned = re.sub(r'\s*[—–]{1,2}\s*', ', ', cleaned)
 
     # Punctuate colons and semicolons with natural pauses
-    cleaned = cleaned.replace(':', ' ... ').replace(';', ', ')
+    cleaned = cleaned.replace(':', ', ').replace(';', ', ')
 
     # Clean up excessive ellipsis or whitespace
     cleaned = re.sub(r'\.{4,}', '...', cleaned)
@@ -218,9 +213,9 @@ class AudioEngine:
             voice_name = self.voice
 
         profile = DRAMATIC_VOICE_PROFILES.get(voice_name, {
-            "rate": "-4%",
-            "pitch": "-2Hz",
-            "name": f"{voice_name} (Custom)"
+            "rate": "+1%",
+            "pitch": "+0Hz",
+            "name": f"{voice_name} (Conversational)"
         })
         profile_copy = dict(profile)
         profile_copy["voice"] = voice_name

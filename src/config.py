@@ -28,7 +28,7 @@ GEMINI_TEXT_MODEL = os.getenv("GEMINI_TEXT_MODEL", "gemini-2.5-flash")
 # Free Video Engine Settings
 # Generates 5-6 distinct AI visuals per Short with 2.5D cinematic camera panning
 VIDEO_ENGINE = "free"
-NUM_SCENES = int(os.getenv("NUM_SCENES", "5"))
+NUM_SCENES = int(os.getenv("NUM_SCENES", "3"))
 
 # AI Horde settings. Register a free key at aihorde.net for much higher
 # priority than the anonymous default, and set it as the HORDE_API_KEY secret.
@@ -57,7 +57,7 @@ RANDOMIZE_VOICES = os.getenv("RANDOMIZE_VOICES", "true").lower() in ("true", "1"
 EDGE_TTS_VOICE_POOL = [
     v.strip() for v in os.getenv(
         "EDGE_TTS_VOICE_POOL",
-        "en-US-GuyNeural,en-US-ChristopherNeural,en-GB-RyanNeural,en-US-EricNeural,en-GB-ThomasNeural"
+        "en-US-AndrewNeural,en-US-BrianNeural,en-US-ChristopherNeural,en-US-GuyNeural,en-US-AvaNeural"
     ).split(",") if v.strip()
 ]
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "").strip()
@@ -74,7 +74,7 @@ VIDEO_WIDTH = int(os.getenv("VIDEO_WIDTH", "720"))
 VIDEO_HEIGHT = int(os.getenv("VIDEO_HEIGHT", "1280"))
 VIDEO_FPS = int(os.getenv("VIDEO_FPS", "24"))
 MAX_DURATION_SECONDS = int(os.getenv("MAX_DURATION_SECONDS", "59"))
-NUM_SCENES = int(os.getenv("NUM_SCENES", "5"))
+NUM_SCENES = int(os.getenv("NUM_SCENES", "3"))
 
 
 # Pipeline Behavior

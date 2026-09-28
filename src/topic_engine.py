@@ -11,30 +11,18 @@ from src import config
 
 logger = logging.getLogger(__name__)
 
-# Expanded rotating categories across 250+ archetypes
+# Research-backed viral niches for YouTube Shorts (2025-2026)
 VIRAL_NICHES = [
-    "Holy Warriors & Crusaders",
-    "Celestial Entities & Angels",
-    "Norse Sky Warriors",
-    "Ancient Legions & Warriors",
-    "Sky Realms & Mythic Beasts",
-    "Cyberpunk & Feudal Warriors",
-    "Shadow Assassins & Rogues",
-    "Feudal Legends & Ronin",
-    "Martial Arts & Monks",
-    "Norse Mythology & Raiders",
-    "Mythical Dragons & Flying Titans",
-    "Celestial Beasts & Avian Titans",
-    "Deep Sea Bioluminescent Leviathans",
-    "Glacial Legends & Ice Titans",
-    "Ancient Titans & Primordials",
-    "Eldritch Terrors & Abyssal Horrors",
-    "Dark Magic & Undead Hordes",
-    "Futuristic Mecha & Sci-Fi Warfare",
-    "Time Travel & Paradoxes",
-    "Neo-Tokyo & Cyberpunk",
-    "Cosmic Entities & Nebula Gods",
-    "Dark Fantasy & Vampires",
+    "Dark Psychology",
+    "Body Science",
+    "Historical What If",
+    "Scary & Creepy",
+    "Space & Cosmos",
+    "Animal Kingdom",
+    "Stoicism & Wisdom",
+    "Unsolved Mysteries",
+    "Conspiracy & Hidden History",
+    "Mind-Blowing Science",
 ]
 
 
@@ -122,14 +110,14 @@ class TopicEngine:
         cat_name = chosen_category or random.choice(VIRAL_NICHES)
         return ShortConcept(
             category=cat_name,
-            concept_title=f"The Legend of the {cat_name.title()}",
+            concept_title=f"Mind-Blowing {cat_name.title()} Facts",
             video_prompt=(
-                f"Cinematic vertical 9:16 framing. An epic {cat_name} unleashing radiant celestial energy "
-                "amidst swirling storm clouds, shattered stone, and glowing embers. Dynamic low-angle tracking camera, "
-                "hyper-detailed armor textures, volumetric god rays, photorealistic 8k render."
+                f"Vertical 9:16 composition. A dramatic visual related to {cat_name}. "
+                "Dark moody lighting, dramatic shadows, mysterious atmosphere, noir aesthetic. "
+                "Hyper-detailed photorealistic 8K render, dramatic chiaroscuro lighting."
             ),
-            voiceover_script=f"When shadows consumed the realm, only the legendary {cat_name} could turn the tide.",
-            youtube_title=f"The Legendary {cat_name.title()} Has Awakened! #Shorts",
-            youtube_description=f"Witness the power of the {cat_name}. Subscribe for daily epic visual encounters!",
-            tags=["Shorts", cat_name.lower().replace(" ", ""), "Fantasy", "Cinematic", "AIArt", "Epic", "Storytelling"]
+            voiceover_script=f"Here's something about {cat_name} that will change how you think forever. Most people have no idea this is true.",
+            youtube_title=f"The Truth About {cat_name.title()} Nobody Tells You #Shorts",
+            youtube_description=f"Mind-blowing facts about {cat_name}. Subscribe for daily content that makes you think! #Shorts #{cat_name.replace(' ', '')}",
+            tags=["Shorts", cat_name.lower().replace(" ", ""), "Facts", "Viral", "MindBlown", "DidYouKnow"]
         )
